@@ -1,18 +1,22 @@
 let produtos = [];
+let produtosFiltrados = [];
 let modoAtual = "eldorado";
+let paginaAtual = 1;
+
+const ITENS_POR_PAGINA = 150;
 
 const CONFIG = {
   eldorado: {
     titulo: "Catálogo Eldorado",
     subtitulo: "Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.",
-    logo: "Logos/Eldorado.png",
+    logo: "Logos/eldorado.png",
     tema: "tema-eldorado",
     filtroTernura: false
   },
   ternura: {
     titulo: "Produtos Ternura",
     subtitulo: "Catálogo exclusivo da linha Produtos Ternura.",
-    logo: "Logos/Produtos-ternura.png",
+    logo: "Logos/produtos-ternura.png",
     tema: "tema-ternura",
     filtroTernura: true
   }
@@ -43,10 +47,11 @@ async function carregarProdutos() {
         ean: String(linha[1] || "").trim(),
         descricao: String(linha[2] || "").trim(),
         embalagem: String(linha[3] || "").trim(),
-        estoque: Number(linha[4] || 0),
-        imagem: String(linha[5] || "").trim(),
-        codigoFornecedor: String(linha[6] || "").trim(),
-        fornecedor: String(linha[7] || "").trim()
+        qtdMaster: String(linha[4] || "").trim(),
+        estoque: Number(linha[5] || 0),
+        imagem: String(linha[6] || "").trim(),
+        codigoFornecedor: String(linha[7] || "").trim(),
+        fornecedor: String(linha[8] || "").trim()
       }))
       .filter(produto =>
         produto.codigo ||
@@ -74,6 +79,7 @@ function normalizar(texto) {
 
 function dividirTermos(texto) {
   return normalizar(texto)
+    .replace(/^%+/, "")
     .split(/\s+|%+/)
     .map(t => t.trim())
     .filter(Boolean);
@@ -89,6 +95,20 @@ function produtosDoModo() {
   return produtos.filter(produto =>
     normalizar(produto.descricao).includes("ternura")
   );
+}
+
+function aplicarFiltroEstoque(lista) {
+  const tipo = document.getElementById("filtroEstoque").value;
+
+  if (tipo === "com-estoque") {
+    return lista.filter(produto => Number(produto.estoque || 0) > 0);
+  }
+
+  if (tipo === "sem-estoque") {
+    return lista.filter(produto => Number(produto.estoque || 0) <= 0);
+  }
+
+  return lista;
 }
 
 function compararCodigo(a, b) {
@@ -133,11 +153,6 @@ function ordenarProdutos(lista) {
     case "maior-estoque":
       listaOrdenada.sort((a, b) => b.estoque - a.estoque);
       break;
-
-    default:
-      listaOrdenada.sort((a, b) =>
-        normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR")
-      );
   }
 
   return listaOrdenada;
@@ -186,8 +201,14 @@ function pontuarFornecedor(nomeFornecedor, termoBusca, estoqueTotal) {
     if (fornecedor.includes(termo)) pontos += 250;
     if (fornecedor.startsWith(termo)) pontos += 300;
 
-    const distancia = calcularDistancia(fornecedor, termo);
-    pontos += Math.max(0, 180 - distancia * 20);
+    const palavras = fornecedor.split(/\s+/).filter(Boolean);
+
+    palavras.forEach(palavra => {
+      if (palavra.startsWith(termo)) pontos += 220;
+
+      const distancia = calcularDistancia(palavra, termo);
+      pontos += Math.max(0, 140 - distancia * 25);
+    });
   });
 
   pontos += Math.min(estoqueTotal, 10000) * 0.01;
@@ -203,7 +224,7 @@ function obterSugestoesFornecedor() {
     return [];
   }
 
-  const base = produtosDoModo();
+  const base = aplicarFiltroEstoque(produtosDoModo());
   const mapaFornecedores = new Map();
 
   base.forEach(produto => {
@@ -255,12 +276,13 @@ function mostrarSugestoesFornecedor() {
     item.className = "sugestao-item";
     item.innerHTML = `
       <strong>${sugestao.nome}</strong>
-      <span>${sugestao.quantidadeProdutos} produtos • Estoque total: ${sugestao.estoqueTotal}</span>
+      <span>${sugestao.quantidadeProdutos} produtos</span>
     `;
 
     item.addEventListener("click", () => {
       document.getElementById("buscaFornecedor").value = sugestao.nome;
       container.classList.remove("ativo");
+      paginaAtual = 1;
       aplicarFiltros();
     });
 
@@ -283,9 +305,93 @@ function fornecedorCombina(produtoFornecedor, buscaFornecedor) {
 
     return palavrasFornecedor.some(palavra => {
       const distancia = calcularDistancia(palavra, termo);
-      return distancia <= 2 || palavra.startsWith(termo);
+      return palavra.startsWith(termo) || distancia <= 2;
     });
   });
+}
+
+function produtoCombinaPrincipal(produto, buscaPrincipal, permitirBuscaLivre) {
+  const busca = normalizar(buscaPrincipal);
+  const termos = dividirTermos(buscaPrincipal);
+
+  if (!termos.length) return true;
+
+  const codigo = normalizar(produto.codigo);
+  const ean = normalizar(produto.ean);
+  const descricao = normalizar(produto.descricao);
+  const primeiraPalavra = termos[0];
+
+  const codigoOuEanCombina = termos.every(termo =>
+    codigo.includes(termo) || ean.includes(termo)
+  );
+
+  if (codigoOuEanCombina) return true;
+
+  const descricaoContemTodos = termos.every(termo =>
+    descricao.includes(termo)
+  );
+
+  if (!descricaoContemTodos) return false;
+
+  if (permitirBuscaLivre || busca.startsWith("%")) {
+    return true;
+  }
+
+  return descricao.startsWith(primeiraPalavra);
+}
+
+function aplicarBuscaPrincipalComPrioridade(lista, buscaPrincipal) {
+  const termos = dividirTermos(buscaPrincipal);
+
+  if (!termos.length) return lista;
+
+  const buscaLivre = normalizar(buscaPrincipal).startsWith("%");
+
+  const resultadoPrioritario = lista.filter(produto =>
+    produtoCombinaPrincipal(produto, buscaPrincipal, buscaLivre)
+  );
+
+  if (resultadoPrioritario.length > 0) {
+    return resultadoPrioritario;
+  }
+
+  return lista.filter(produto =>
+    produtoCombinaPrincipal(produto, buscaPrincipal, true)
+  );
+}
+
+function gerarMensagemSemResultado() {
+  const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
+  const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value.trim();
+  const buscaFornecedor = document.getElementById("buscaFornecedor").value.trim();
+
+  const partes = [];
+
+  if (buscaPrincipal) {
+    partes.push(`"${buscaPrincipal}"`);
+  }
+
+  if (buscaCodigoFornecedor) {
+    partes.push(`código de fornecedor "${buscaCodigoFornecedor}"`);
+  }
+
+  if (buscaFornecedor) {
+    partes.push(`fornecedor "${buscaFornecedor}"`);
+  }
+
+  if (!partes.length) {
+    return "Nenhum produto encontrado.";
+  }
+
+  if (partes.length === 1) {
+    return `Nenhum produto encontrado para ${partes[0]}.`;
+  }
+
+  if (partes.length === 2) {
+    return `Nenhum produto encontrado para ${partes[0]} dentro de ${partes[1]}.`;
+  }
+
+  return `Nenhum produto encontrado para ${partes[0]} no ${partes[1]} e ${partes[2]}.`;
 }
 
 function aplicarFiltros() {
@@ -293,70 +399,62 @@ function aplicarFiltros() {
   const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value;
   const buscaFornecedor = document.getElementById("buscaFornecedor").value;
 
-  const termosPrincipal = dividirTermos(buscaPrincipal);
   const termosCodigoFornecedor = dividirTermos(buscaCodigoFornecedor);
   const termosFornecedor = dividirTermos(buscaFornecedor);
 
-  const base = produtosDoModo();
+  let resultado = produtosDoModo();
 
-  const temBusca =
-    termosPrincipal.length > 0 ||
-    termosCodigoFornecedor.length > 0 ||
-    termosFornecedor.length > 0;
+  resultado = aplicarFiltroEstoque(resultado);
 
-  let resultado;
+  resultado = resultado.filter(produto => {
+    const textoCodigoFornecedor = normalizar(produto.codigoFornecedor);
 
-  if (!temBusca) {
-    resultado = ordenarProdutos(base).slice(0, 100);
-  } else {
-    resultado = base.filter(produto => {
-      const textoPrincipal = normalizar(`
-        ${produto.codigo}
-        ${produto.ean}
-        ${produto.descricao}
-      `);
+    const encontrouCodigoFornecedor = termosCodigoFornecedor.every(termo =>
+      textoCodigoFornecedor.includes(termo)
+    );
 
-      const textoCodigoFornecedor = normalizar(produto.codigoFornecedor);
+    const encontrouFornecedor = fornecedorCombina(produto.fornecedor, buscaFornecedor);
 
-      const encontrouPrincipal = termosPrincipal.every(termo =>
-        textoPrincipal.includes(termo)
-      );
+    return encontrouCodigoFornecedor && encontrouFornecedor;
+  });
 
-      const encontrouCodigoFornecedor = termosCodigoFornecedor.every(termo =>
-        textoCodigoFornecedor.includes(termo)
-      );
+  resultado = aplicarBuscaPrincipalComPrioridade(resultado, buscaPrincipal);
+  resultado = ordenarProdutos(resultado);
 
-      const encontrouFornecedor = fornecedorCombina(produto.fornecedor, buscaFornecedor);
+  produtosFiltrados = resultado;
+  paginaAtual = 1;
 
-      return (
-        encontrouPrincipal &&
-        encontrouCodigoFornecedor &&
-        encontrouFornecedor
-      );
-    });
-
-    resultado = ordenarProdutos(resultado).slice(0, 300);
-  }
-
-  mostrarProdutos(resultado, !temBusca);
+  mostrarProdutos();
 }
 
-function mostrarProdutos(lista, telaInicial = false) {
+function mostrarProdutos() {
   const catalogo = document.getElementById("catalogo");
   const contador = document.getElementById("contador");
+  const paginacao = document.getElementById("paginacao");
 
   catalogo.innerHTML = "";
+  paginacao.innerHTML = "";
 
-  contador.innerText = telaInicial
-    ? `${lista.length} produtos em destaque`
-    : `${lista.length} produtos encontrados`;
+  const totalProdutos = produtosFiltrados.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalProdutos / ITENS_POR_PAGINA));
 
-  if (lista.length === 0) {
-    catalogo.innerHTML = "<p>Nenhum produto encontrado.</p>";
+  if (paginaAtual > totalPaginas) {
+    paginaAtual = totalPaginas;
+  }
+
+  if (totalProdutos === 0) {
+    contador.innerText = "0 produtos encontrados";
+    catalogo.innerHTML = `<p>${gerarMensagemSemResultado()}</p>`;
     return;
   }
 
-  lista.forEach(produto => {
+  const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
+  const fim = inicio + ITENS_POR_PAGINA;
+  const produtosDaPagina = produtosFiltrados.slice(inicio, fim);
+
+  contador.innerText = `${totalProdutos} produtos encontrados • Página ${paginaAtual} de ${totalPaginas}`;
+
+  produtosDaPagina.forEach(produto => {
     const card = document.createElement("div");
     card.className = "card";
 
@@ -375,6 +473,7 @@ function mostrarProdutos(lista, telaInicial = false) {
       <div class="descricao">${produto.descricao || "Descrição não informada"}</div>
       <div class="info">EAN: ${produto.ean || "Não informado"}</div>
       <div class="info">Embalagem: ${produto.embalagem || "Não informada"}</div>
+      <div class="info">QTD Master: ${produto.qtdMaster || "Não informada"}</div>
       <div class="info">Estoque: ${produto.estoque || 0}</div>
       <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
       <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
@@ -382,6 +481,33 @@ function mostrarProdutos(lista, telaInicial = false) {
 
     catalogo.appendChild(card);
   });
+
+  if (totalPaginas > 1) {
+    const btnAnterior = document.createElement("button");
+    btnAnterior.innerText = "Anterior";
+    btnAnterior.disabled = paginaAtual === 1;
+    btnAnterior.addEventListener("click", () => {
+      paginaAtual--;
+      mostrarProdutos();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    const indicador = document.createElement("span");
+    indicador.innerText = `Página ${paginaAtual} de ${totalPaginas}`;
+
+    const btnProxima = document.createElement("button");
+    btnProxima.innerText = "Próxima";
+    btnProxima.disabled = paginaAtual === totalPaginas;
+    btnProxima.addEventListener("click", () => {
+      paginaAtual++;
+      mostrarProdutos();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    paginacao.appendChild(btnAnterior);
+    paginacao.appendChild(indicador);
+    paginacao.appendChild(btnProxima);
+  }
 }
 
 function trocarModo(novoModo) {
@@ -423,6 +549,10 @@ document.getElementById("buscaFornecedor").addEventListener("input", () => {
 document.getElementById("buscaFornecedor").addEventListener("focus", mostrarSugestoesFornecedor);
 
 document.getElementById("ordenacao").addEventListener("change", aplicarFiltros);
+document.getElementById("filtroEstoque").addEventListener("change", () => {
+  mostrarSugestoesFornecedor();
+  aplicarFiltros();
+});
 
 document.getElementById("btnMenu").addEventListener("click", function(event) {
   event.stopPropagation();

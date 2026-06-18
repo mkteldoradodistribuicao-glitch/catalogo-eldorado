@@ -10,7 +10,7 @@
 
   <header class="topo">
     <div class="topo-conteudo">
-      <img id="logoCatalogo" src="Logos/Eldorado.png" alt="Logo do catálogo" class="logo" />
+      <img id="logoCatalogo" src="Logos/eldorado.png" alt="Logo do catálogo" class="logo" />
 
       <div class="titulo-area">
         <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
@@ -54,21 +54,34 @@
         </div>
       </div>
 
-      <div class="ordenacao-area">
-        <label for="ordenacao">Ordenar por:</label>
-        <select id="ordenacao">
-          <option value="descricao-az">Descrição A-Z</option>
-          <option value="descricao-za">Descrição Z-A</option>
-          <option value="codigo-crescente">Código do Produto Crescente</option>
-          <option value="codigo-decrescente">Código do Produto Decrescente</option>
-          <option value="maior-estoque">Maior Estoque</option>
-        </select>
+      <div class="controles-area">
+        <div class="ordenacao-area">
+          <label for="ordenacao">Ordenar por:</label>
+          <select id="ordenacao">
+            <option value="descricao-az">Descrição A-Z</option>
+            <option value="descricao-za">Descrição Z-A</option>
+            <option value="codigo-crescente">Código do Produto Crescente</option>
+            <option value="codigo-decrescente">Código do Produto Decrescente</option>
+            <option value="maior-estoque">Maior Estoque</option>
+          </select>
+        </div>
+
+        <div class="estoque-area">
+          <label for="filtroEstoque">Estoque:</label>
+          <select id="filtroEstoque">
+            <option value="com-estoque" selected>Apenas Produtos com Estoque</option>
+            <option value="sem-estoque">Apenas Produtos sem Estoque</option>
+            <option value="todos">Todos os Produtos</option>
+          </select>
+        </div>
       </div>
     </section>
 
     <div id="contador"></div>
 
     <section id="catalogo"></section>
+
+    <div id="paginacao" class="paginacao"></div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
