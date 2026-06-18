@@ -133,6 +133,7 @@ body.tema-ternura {
   grid-template-columns: 2fr 0.7fr 1fr;
   gap: 12px;
   margin-bottom: 12px;
+  align-items: start;
 }
 
 .busca-area input {
@@ -148,6 +149,54 @@ body.tema-ternura {
 .busca-area input:focus {
   border-color: var(--cor-secundaria);
   box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+
+.campo-fornecedor {
+  position: relative;
+}
+
+.sugestoes-fornecedor {
+  display: none;
+  position: absolute;
+  top: 54px;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  overflow: hidden;
+  z-index: 30;
+}
+
+.sugestoes-fornecedor.ativo {
+  display: block;
+}
+
+.sugestao-item {
+  width: 100%;
+  padding: 12px 14px;
+  background: white;
+  border: none;
+  border-bottom: 1px solid #eeeeee;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sugestao-item:hover {
+  background: var(--cor-suave);
+}
+
+.sugestao-item strong {
+  display: block;
+  color: var(--cor-principal);
+  font-size: 14px;
+}
+
+.sugestao-item span {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-top: 3px;
 }
 
 .ordenacao-area {

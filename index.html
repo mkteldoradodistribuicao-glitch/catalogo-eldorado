@@ -10,7 +10,7 @@
 
   <header class="topo">
     <div class="topo-conteudo">
-      <img id="logoCatalogo" src="logos/eldorado.png" alt="Logo do catálogo" class="logo" />
+      <img id="logoCatalogo" src="Logos/eldorado.png" alt="Logo do catálogo" class="logo" />
 
       <div class="titulo-area">
         <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
@@ -43,12 +43,15 @@
           autocomplete="off"
         />
 
-        <input
-          type="text"
-          id="buscaFornecedor"
-          placeholder="Fornecedor"
-          autocomplete="off"
-        />
+        <div class="campo-fornecedor">
+          <input
+            type="text"
+            id="buscaFornecedor"
+            placeholder="Fornecedor"
+            autocomplete="off"
+          />
+          <div id="sugestoesFornecedor" class="sugestoes-fornecedor"></div>
+        </div>
       </div>
 
       <div class="ordenacao-area">
