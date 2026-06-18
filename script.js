@@ -9,14 +9,14 @@ const CONFIG = {
   eldorado: {
     titulo: "Catálogo Eldorado",
     subtitulo: "Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.",
-    logo: "Logos/eldorado.png",
+    logo: "Logos/Eldorado.png",
     tema: "tema-eldorado",
     filtroTernura: false
   },
   ternura: {
     titulo: "Produtos Ternura",
     subtitulo: "Catálogo exclusivo da linha Produtos Ternura.",
-    logo: "Logos/produtos-ternura.png",
+    logo: "Logos/Produtos-ternura.png",
     tema: "tema-ternura",
     filtroTernura: true
   }
