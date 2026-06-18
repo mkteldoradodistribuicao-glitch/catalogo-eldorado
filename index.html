@@ -14,7 +14,7 @@
 
       <div class="titulo-area">
         <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
-        <p id="subtituloCatalogo">Consulte produtos por código, descrição ou EAN.</p>
+        <p id="subtituloCatalogo">Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.</p>
       </div>
 
       <button id="btnMenu" class="menu-btn" aria-label="Abrir menu">☰</button>
@@ -27,13 +27,40 @@
   </header>
 
   <main class="container">
-    <section class="busca-area">
-      <input
-        type="text"
-        id="busca"
-        placeholder="Buscar por código, descrição ou EAN..."
-        autocomplete="off"
-      />
+    <section class="filtros-area">
+      <div class="busca-area">
+        <input
+          type="text"
+          id="buscaPrincipal"
+          placeholder="Buscar por código do produto, EAN ou descrição..."
+          autocomplete="off"
+        />
+
+        <input
+          type="text"
+          id="buscaCodigoFornecedor"
+          placeholder="Código Fornecedor"
+          autocomplete="off"
+        />
+
+        <input
+          type="text"
+          id="buscaFornecedor"
+          placeholder="Fornecedor"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="ordenacao-area">
+        <label for="ordenacao">Ordenar por:</label>
+        <select id="ordenacao">
+          <option value="descricao-az">Descrição A-Z</option>
+          <option value="descricao-za">Descrição Z-A</option>
+          <option value="codigo-crescente">Código do Produto Crescente</option>
+          <option value="codigo-decrescente">Código do Produto Decrescente</option>
+          <option value="maior-estoque">Maior Estoque</option>
+        </select>
+      </div>
     </section>
 
     <div id="contador"></div>

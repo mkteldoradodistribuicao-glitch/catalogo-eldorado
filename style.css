@@ -3,12 +3,12 @@
 }
 
 :root {
-  --cor-principal: #003b73;
-  --cor-secundaria: #0b74bd;
-  --cor-fundo: #f3f5f7;
+  --cor-principal: #009639;
+  --cor-secundaria: #ff6b1a;
+  --cor-fundo: #f4f6f4;
   --cor-card: #ffffff;
   --cor-texto: #222222;
-  --cor-suave: #eef3f8;
+  --cor-suave: #e9f7ee;
 }
 
 body {
@@ -19,21 +19,21 @@ body {
 }
 
 body.tema-eldorado {
-  --cor-principal: #003b73;
-  --cor-secundaria: #0b74bd;
-  --cor-fundo: #f3f5f7;
-  --cor-suave: #eef3f8;
+  --cor-principal: #009639;
+  --cor-secundaria: #ff6b1a;
+  --cor-fundo: #f4f6f4;
+  --cor-suave: #e9f7ee;
 }
 
 body.tema-ternura {
-  --cor-principal: #9b1c1f;
-  --cor-secundaria: #c62828;
-  --cor-fundo: #fff7f4;
-  --cor-suave: #fdecea;
+  --cor-principal: #002f5f;
+  --cor-secundaria: #0b74bd;
+  --cor-fundo: #f3f8fc;
+  --cor-suave: #e8f3fb;
 }
 
 .topo {
-  background: var(--cor-principal);
+  background: linear-gradient(135deg, var(--cor-principal), var(--cor-secundaria));
   color: white;
   padding: 18px 16px;
   position: relative;
@@ -68,7 +68,7 @@ body.tema-ternura {
 .titulo-area p {
   margin: 6px 0 0;
   font-size: 14px;
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 .menu-btn {
@@ -124,20 +124,57 @@ body.tema-ternura {
   padding: 0 16px;
 }
 
-.busca-area {
+.filtros-area {
   margin-bottom: 14px;
 }
 
-#busca {
+.busca-area {
+  display: grid;
+  grid-template-columns: 2fr 0.7fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.busca-area input {
   width: 100%;
   padding: 15px 18px;
   font-size: 16px;
   border: 1px solid #cfcfcf;
   border-radius: 12px;
   outline: none;
+  background: white;
 }
 
-#busca:focus {
+.busca-area input:focus {
+  border-color: var(--cor-secundaria);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+
+.ordenacao-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.ordenacao-area label {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--cor-principal);
+}
+
+.ordenacao-area select {
+  padding: 12px 14px;
+  border: 1px solid #cfcfcf;
+  border-radius: 10px;
+  background: white;
+  color: #222;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ordenacao-area select:focus {
   border-color: var(--cor-secundaria);
   box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
 }
@@ -160,6 +197,7 @@ body.tema-ternura {
   padding: 16px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-top: 4px solid var(--cor-principal);
 }
 
 .card:hover {
@@ -244,6 +282,19 @@ body.tema-ternura {
   .menu-lateral {
     top: 74px;
     right: 12px;
+  }
+
+  .busca-area {
+    grid-template-columns: 1fr;
+  }
+
+  .ordenacao-area {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ordenacao-area select {
+    width: 100%;
   }
 
   #catalogo {

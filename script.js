@@ -4,17 +4,17 @@ let modoAtual = "eldorado";
 const CONFIG = {
   eldorado: {
     titulo: "Catálogo Eldorado",
-    subtitulo: "Consulte produtos por código, descrição ou EAN.",
+    subtitulo: "Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.",
     logo: "logos/eldorado.png",
     tema: "tema-eldorado",
-    filtroFornecedor: null
+    filtroTernura: false
   },
   ternura: {
     titulo: "Produtos Ternura",
     subtitulo: "Catálogo exclusivo da linha Produtos Ternura.",
     logo: "logos/produtos-ternura.png",
     tema: "tema-ternura",
-    filtroFornecedor: "ternura"
+    filtroTernura: true
   }
 };
 
@@ -83,103 +83,122 @@ function dividirTermos(texto) {
 function produtosDoModo() {
   const config = CONFIG[modoAtual];
 
-  if (!config.filtroFornecedor) {
+  if (!config.filtroTernura) {
     return produtos;
   }
 
   return produtos.filter(produto =>
-    normalizar(produto.fornecedor).includes(config.filtroFornecedor)
+    normalizar(produto.descricao).includes("ternura")
   );
 }
 
-function calcularRelevancia(produto, termos, buscaOriginal) {
-  const codigo = normalizar(produto.codigo);
-  const ean = normalizar(produto.ean);
-  const descricao = normalizar(produto.descricao);
-  const embalagem = normalizar(produto.embalagem);
+function compararCodigo(a, b) {
+  const codigoA = normalizar(a.codigo);
+  const codigoB = normalizar(b.codigo);
 
-  const textoCompleto = normalizar(`
-    ${produto.codigo}
-    ${produto.ean}
-    ${produto.descricao}
-    ${produto.embalagem}
-  `);
+  const numeroA = Number(codigoA);
+  const numeroB = Number(codigoB);
 
-  let pontos = 0;
-
-  if (!termos.length) {
-    return produto.estoque;
+  if (!isNaN(numeroA) && !isNaN(numeroB)) {
+    return numeroA - numeroB;
   }
 
-  if (codigo === buscaOriginal) pontos += 1000;
-  if (ean === buscaOriginal) pontos += 1000;
+  return codigoA.localeCompare(codigoB, "pt-BR", { numeric: true });
+}
 
-  if (codigo.includes(buscaOriginal)) pontos += 500;
-  if (ean.includes(buscaOriginal)) pontos += 500;
+function ordenarProdutos(lista) {
+  const tipoOrdenacao = document.getElementById("ordenacao").value;
 
-  if (descricao === buscaOriginal) pontos += 400;
-  if (descricao.startsWith(buscaOriginal)) pontos += 300;
-  if (descricao.includes(buscaOriginal)) pontos += 200;
+  const listaOrdenada = [...lista];
 
-  termos.forEach(termo => {
-    if (codigo.includes(termo)) pontos += 120;
-    if (ean.includes(termo)) pontos += 120;
-    if (descricao.includes(termo)) pontos += 100;
-    if (embalagem.includes(termo)) pontos += 40;
-  });
+  switch (tipoOrdenacao) {
+    case "codigo-crescente":
+      listaOrdenada.sort((a, b) => compararCodigo(a, b));
+      break;
 
-  const todosTermosEncontrados = termos.every(termo =>
-    textoCompleto.includes(termo)
-  );
+    case "codigo-decrescente":
+      listaOrdenada.sort((a, b) => compararCodigo(b, a));
+      break;
 
-  if (todosTermosEncontrados) pontos += 200;
+    case "descricao-az":
+      listaOrdenada.sort((a, b) =>
+        normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR")
+      );
+      break;
 
-  pontos += produto.estoque * 0.01;
+    case "descricao-za":
+      listaOrdenada.sort((a, b) =>
+        normalizar(b.descricao).localeCompare(normalizar(a.descricao), "pt-BR")
+      );
+      break;
 
-  return pontos;
+    case "maior-estoque":
+      listaOrdenada.sort((a, b) => b.estoque - a.estoque);
+      break;
+
+    default:
+      listaOrdenada.sort((a, b) =>
+        normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR")
+      );
+  }
+
+  return listaOrdenada;
 }
 
 function aplicarFiltros() {
-  const campoBusca = document.getElementById("busca");
-  const termoDigitado = campoBusca.value;
-  const buscaNormalizada = normalizar(termoDigitado);
-  const termos = dividirTermos(termoDigitado);
+  const buscaPrincipal = document.getElementById("buscaPrincipal").value;
+  const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value;
+  const buscaFornecedor = document.getElementById("buscaFornecedor").value;
+
+  const termosPrincipal = dividirTermos(buscaPrincipal);
+  const termosCodigoFornecedor = dividirTermos(buscaCodigoFornecedor);
+  const termosFornecedor = dividirTermos(buscaFornecedor);
 
   const base = produtosDoModo();
 
+  const temBusca =
+    termosPrincipal.length > 0 ||
+    termosCodigoFornecedor.length > 0 ||
+    termosFornecedor.length > 0;
+
   let resultado;
 
-  if (!termos.length) {
-    resultado = [...base]
-      .sort((a, b) => b.estoque - a.estoque)
-      .slice(0, 100);
+  if (!temBusca) {
+    resultado = ordenarProdutos(base).slice(0, 100);
   } else {
-    resultado = base
-      .map(produto => {
-        const textoCompleto = normalizar(`
-          ${produto.codigo}
-          ${produto.ean}
-          ${produto.descricao}
-          ${produto.embalagem}
-        `);
+    resultado = base.filter(produto => {
+      const textoPrincipal = normalizar(`
+        ${produto.codigo}
+        ${produto.ean}
+        ${produto.descricao}
+      `);
 
-        const encontrado = termos.every(termo =>
-          textoCompleto.includes(termo)
-        );
+      const textoCodigoFornecedor = normalizar(produto.codigoFornecedor);
+      const textoFornecedor = normalizar(produto.fornecedor);
 
-        return {
-          ...produto,
-          relevancia: encontrado
-            ? calcularRelevancia(produto, termos, buscaNormalizada)
-            : 0
-        };
-      })
-      .filter(produto => produto.relevancia > 0)
-      .sort((a, b) => b.relevancia - a.relevancia)
-      .slice(0, 300);
+      const encontrouPrincipal = termosPrincipal.every(termo =>
+        textoPrincipal.includes(termo)
+      );
+
+      const encontrouCodigoFornecedor = termosCodigoFornecedor.every(termo =>
+        textoCodigoFornecedor.includes(termo)
+      );
+
+      const encontrouFornecedor = termosFornecedor.every(termo =>
+        textoFornecedor.includes(termo)
+      );
+
+      return (
+        encontrouPrincipal &&
+        encontrouCodigoFornecedor &&
+        encontrouFornecedor
+      );
+    });
+
+    resultado = ordenarProdutos(resultado).slice(0, 300);
   }
 
-  mostrarProdutos(resultado, termos.length === 0);
+  mostrarProdutos(resultado, !temBusca);
 }
 
 function mostrarProdutos(lista, telaInicial = false) {
@@ -212,10 +231,11 @@ function mostrarProdutos(lista, telaInicial = false) {
           : `<div class="sem-imagem">Sem imagem</div>`
       }
 
-      <div class="codigo">Código: ${produto.codigo}</div>
-      <div class="descricao">${produto.descricao}</div>
+      <div class="codigo">Código: ${produto.codigo || "Não informado"}</div>
+      <div class="descricao">${produto.descricao || "Descrição não informada"}</div>
       <div class="info">EAN: ${produto.ean || "Não informado"}</div>
       <div class="info">Embalagem: ${produto.embalagem || "Não informada"}</div>
+      <div class="info">Estoque: ${produto.estoque || 0}</div>
       <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
       <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
     `;
@@ -233,7 +253,10 @@ function trocarModo(novoModo) {
   document.getElementById("logoCatalogo").src = config.logo;
   document.getElementById("tituloCatalogo").innerText = config.titulo;
   document.getElementById("subtituloCatalogo").innerText = config.subtitulo;
-  document.getElementById("busca").value = "";
+
+  document.getElementById("buscaPrincipal").value = "";
+  document.getElementById("buscaCodigoFornecedor").value = "";
+  document.getElementById("buscaFornecedor").value = "";
 
   fecharMenu();
   aplicarFiltros();
@@ -247,7 +270,10 @@ function fecharMenu() {
   document.getElementById("menuLateral").classList.remove("aberto");
 }
 
-document.getElementById("busca").addEventListener("input", aplicarFiltros);
+document.getElementById("buscaPrincipal").addEventListener("input", aplicarFiltros);
+document.getElementById("buscaCodigoFornecedor").addEventListener("input", aplicarFiltros);
+document.getElementById("buscaFornecedor").addEventListener("input", aplicarFiltros);
+document.getElementById("ordenacao").addEventListener("change", aplicarFiltros);
 
 document.getElementById("btnMenu").addEventListener("click", function(event) {
   event.stopPropagation();
