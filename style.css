@@ -2,28 +2,120 @@
   box-sizing: border-box;
 }
 
+:root {
+  --cor-principal: #003b73;
+  --cor-secundaria: #0b74bd;
+  --cor-fundo: #f3f5f7;
+  --cor-card: #ffffff;
+  --cor-texto: #222222;
+  --cor-suave: #eef3f8;
+}
+
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #f3f5f7;
-  color: #222;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+body.tema-eldorado {
+  --cor-principal: #003b73;
+  --cor-secundaria: #0b74bd;
+  --cor-fundo: #f3f5f7;
+  --cor-suave: #eef3f8;
+}
+
+body.tema-ternura {
+  --cor-principal: #9b1c1f;
+  --cor-secundaria: #c62828;
+  --cor-fundo: #fff7f4;
+  --cor-suave: #fdecea;
 }
 
 .topo {
-  background: #003b73;
+  background: var(--cor-principal);
   color: white;
-  text-align: center;
-  padding: 28px 16px;
+  padding: 18px 16px;
+  position: relative;
 }
 
-.topo h1 {
+.topo-conteudo {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  height: 58px;
+  max-width: 180px;
+  object-fit: contain;
+  background: white;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.titulo-area {
+  flex: 1;
+}
+
+.titulo-area h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 26px;
 }
 
-.topo p {
-  margin: 8px 0 0;
+.titulo-area p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.menu-btn {
+  background: white;
+  color: var(--cor-principal);
+  border: none;
+  font-size: 28px;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.menu-lateral {
+  display: none;
+  position: absolute;
+  top: 82px;
+  right: 20px;
+  width: 230px;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.menu-lateral.aberto {
+  display: block;
+}
+
+.menu-lateral button {
+  width: 100%;
+  padding: 16px;
+  background: white;
+  border: none;
+  text-align: left;
+  cursor: pointer;
   font-size: 15px;
+  color: #222;
+  border-bottom: 1px solid #eee;
+}
+
+.menu-lateral button:hover {
+  background: var(--cor-suave);
+  color: var(--cor-principal);
+  font-weight: bold;
 }
 
 .container {
@@ -32,13 +124,22 @@ body {
   padding: 0 16px;
 }
 
+.busca-area {
+  margin-bottom: 14px;
+}
+
 #busca {
   width: 100%;
-  padding: 14px 16px;
+  padding: 15px 18px;
   font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  margin-bottom: 14px;
+  border: 1px solid #cfcfcf;
+  border-radius: 12px;
+  outline: none;
+}
+
+#busca:focus {
+  border-color: var(--cor-secundaria);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
 }
 
 #contador {
@@ -54,10 +155,16 @@ body {
 }
 
 .card {
-  background: white;
-  border-radius: 14px;
+  background: var(--cor-card);
+  border-radius: 16px;
   padding: 16px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
 }
 
 .card img {
@@ -69,7 +176,7 @@ body {
 
 .codigo {
   font-weight: bold;
-  color: #003b73;
+  color: var(--cor-principal);
   font-size: 15px;
 }
 
@@ -78,6 +185,7 @@ body {
   font-weight: bold;
   margin: 8px 0;
   min-height: 44px;
+  line-height: 1.3;
 }
 
 .info {
@@ -90,8 +198,8 @@ body {
   margin-top: 10px;
   display: inline-block;
   padding: 6px 10px;
-  background: #eef3f8;
-  color: #003b73;
+  background: var(--cor-suave);
+  color: var(--cor-principal);
   border-radius: 20px;
   font-size: 12px;
   font-weight: bold;
@@ -107,4 +215,44 @@ body {
   border-radius: 10px;
   margin-bottom: 12px;
   font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .topo-conteudo {
+    gap: 10px;
+  }
+
+  .logo {
+    height: 48px;
+    max-width: 130px;
+  }
+
+  .titulo-area h1 {
+    font-size: 20px;
+  }
+
+  .titulo-area p {
+    font-size: 12px;
+  }
+
+  .menu-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+  }
+
+  .menu-lateral {
+    top: 74px;
+    right: 12px;
+  }
+
+  #catalogo {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+  }
+
+  .card img,
+  .sem-imagem {
+    height: 140px;
+  }
 }

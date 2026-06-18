@@ -1,24 +1,40 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Catálogo Eldorado</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="tema-eldorado">
 
   <header class="topo">
-    <h1>Catálogo de Produtos</h1>
-    <p>Consulte código, descrição, EAN, embalagem e fornecedor.</p>
+    <div class="topo-conteudo">
+      <img id="logoCatalogo" src="logos/eldorado.png" alt="Logo do catálogo" class="logo" />
+
+      <div class="titulo-area">
+        <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
+        <p id="subtituloCatalogo">Consulte produtos por código, descrição ou EAN.</p>
+      </div>
+
+      <button id="btnMenu" class="menu-btn" aria-label="Abrir menu">☰</button>
+    </div>
+
+    <nav id="menuLateral" class="menu-lateral">
+      <button id="btnCatalogoEldorado">Catálogo Eldorado</button>
+      <button id="btnProdutosTernura">Produtos Ternura</button>
+    </nav>
   </header>
 
   <main class="container">
-    <input 
-      type="text" 
-      id="busca" 
-      placeholder="Buscar por código, descrição, EAN ou fornecedor..."
-    >
+    <section class="busca-area">
+      <input
+        type="text"
+        id="busca"
+        placeholder="Buscar por código, descrição ou EAN..."
+        autocomplete="off"
+      />
+    </section>
 
     <div id="contador"></div>
 
@@ -27,6 +43,5 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="script.js"></script>
-
 </body>
 </html>
