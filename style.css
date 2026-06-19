@@ -14,8 +14,12 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: var(--cor-fundo);
+  background:
+    radial-gradient(circle at top left, rgba(0, 150, 57, 0.10), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(255, 107, 26, 0.10), transparent 30%),
+    linear-gradient(180deg, var(--cor-fundo), #ffffff);
   color: var(--cor-texto);
+  min-height: 100vh;
 }
 
 body.tema-eldorado {
@@ -30,13 +34,19 @@ body.tema-ternura {
   --cor-secundaria: #0b74bd;
   --cor-fundo: #f3f8fc;
   --cor-suave: #e8f3fb;
+
+  background:
+    radial-gradient(circle at top left, rgba(0, 47, 95, 0.12), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(11, 116, 189, 0.10), transparent 30%),
+    linear-gradient(180deg, var(--cor-fundo), #ffffff);
 }
 
 .topo {
   background: linear-gradient(135deg, var(--cor-principal), var(--cor-secundaria));
   color: white;
-  padding: 18px 16px;
+  padding: 24px 16px;
   position: relative;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
 }
 
 .topo-conteudo {
@@ -44,16 +54,16 @@ body.tema-ternura {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .logo {
-  height: 58px;
-  max-width: 180px;
+  height: 110px;
+  max-width: 330px;
   object-fit: contain;
-  background: white;
-  border-radius: 10px;
-  padding: 6px;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
 }
 
 .titulo-area {
@@ -62,7 +72,7 @@ body.tema-ternura {
 
 .titulo-area h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
 }
 
 .titulo-area p {
@@ -86,7 +96,7 @@ body.tema-ternura {
 .menu-lateral {
   display: none;
   position: absolute;
-  top: 82px;
+  top: 112px;
   right: 20px;
   width: 230px;
   background: white;
@@ -120,12 +130,17 @@ body.tema-ternura {
 
 .container {
   max-width: 1200px;
-  margin: 24px auto;
+  margin: 26px auto;
   padding: 0 16px;
 }
 
 .filtros-area {
   margin-bottom: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.78);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  backdrop-filter: blur(4px);
 }
 
 .busca-area {
@@ -238,6 +253,23 @@ body.tema-ternura {
   box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
 }
 
+.btn-limpar {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--cor-principal);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-limpar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(0,0,0,0.14);
+}
+
 #contador {
   margin-bottom: 18px;
   font-size: 14px;
@@ -251,17 +283,18 @@ body.tema-ternura {
 }
 
 .card {
-  background: var(--cor-card);
-  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 18px;
   padding: 16px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   border-top: 4px solid var(--cor-principal);
+  backdrop-filter: blur(4px);
 }
 
 .card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
 }
 
 .card img {
@@ -349,8 +382,8 @@ body.tema-ternura {
   }
 
   .logo {
-    height: 48px;
-    max-width: 130px;
+    height: 76px;
+    max-width: 180px;
   }
 
   .titulo-area h1 {
@@ -368,7 +401,7 @@ body.tema-ternura {
   }
 
   .menu-lateral {
-    top: 74px;
+    top: 92px;
     right: 12px;
   }
 
@@ -387,7 +420,8 @@ body.tema-ternura {
   }
 
   .ordenacao-area select,
-  .estoque-area select {
+  .estoque-area select,
+  .btn-limpar {
     width: 100%;
   }
 

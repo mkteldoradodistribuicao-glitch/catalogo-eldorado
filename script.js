@@ -16,7 +16,7 @@ const CONFIG = {
   ternura: {
     titulo: "Produtos Ternura",
     subtitulo: "Catálogo exclusivo da linha Produtos Ternura.",
-    logo: "Logos/Produtos-ternura.png",
+    logo: "Logos/Produtos-Ternura.png",
     tema: "tema-ternura",
     filtroTernura: true
   }
@@ -93,7 +93,8 @@ function produtosDoModo() {
   }
 
   return produtos.filter(produto =>
-    normalizar(produto.descricao).includes("ternura")
+    normalizar(produto.descricao).includes("ternura") &&
+    String(produto.codigo).trim() !== "93217"
   );
 }
 
@@ -400,7 +401,6 @@ function aplicarFiltros() {
   const buscaFornecedor = document.getElementById("buscaFornecedor").value;
 
   const termosCodigoFornecedor = dividirTermos(buscaCodigoFornecedor);
-  const termosFornecedor = dividirTermos(buscaFornecedor);
 
   let resultado = produtosDoModo();
 
@@ -474,7 +474,6 @@ function mostrarProdutos() {
       <div class="info">EAN: ${produto.ean || "Não informado"}</div>
       <div class="info">Embalagem: ${produto.embalagem || "Não informada"}</div>
       <div class="info">QTD Master: ${produto.qtdMaster || "Não informada"}</div>
-      <div class="info">Estoque: ${produto.estoque || 0}</div>
       <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
       <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
     `;
@@ -510,6 +509,18 @@ function mostrarProdutos() {
   }
 }
 
+function limparFiltros() {
+  document.getElementById("buscaPrincipal").value = "";
+  document.getElementById("buscaCodigoFornecedor").value = "";
+  document.getElementById("buscaFornecedor").value = "";
+  document.getElementById("ordenacao").value = "descricao-az";
+  document.getElementById("filtroEstoque").value = "com-estoque";
+  document.getElementById("sugestoesFornecedor").classList.remove("ativo");
+
+  paginaAtual = 1;
+  aplicarFiltros();
+}
+
 function trocarModo(novoModo) {
   modoAtual = novoModo;
 
@@ -520,14 +531,8 @@ function trocarModo(novoModo) {
   document.getElementById("tituloCatalogo").innerText = config.titulo;
   document.getElementById("subtituloCatalogo").innerText = config.subtitulo;
 
-  document.getElementById("buscaPrincipal").value = "";
-  document.getElementById("buscaCodigoFornecedor").value = "";
-  document.getElementById("buscaFornecedor").value = "";
-
-  document.getElementById("sugestoesFornecedor").classList.remove("ativo");
-
+  limparFiltros();
   fecharMenu();
-  aplicarFiltros();
 }
 
 function abrirFecharMenu() {
@@ -549,10 +554,13 @@ document.getElementById("buscaFornecedor").addEventListener("input", () => {
 document.getElementById("buscaFornecedor").addEventListener("focus", mostrarSugestoesFornecedor);
 
 document.getElementById("ordenacao").addEventListener("change", aplicarFiltros);
+
 document.getElementById("filtroEstoque").addEventListener("change", () => {
   mostrarSugestoesFornecedor();
   aplicarFiltros();
 });
+
+document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
 
 document.getElementById("btnMenu").addEventListener("click", function(event) {
   event.stopPropagation();
