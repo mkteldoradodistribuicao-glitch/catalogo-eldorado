@@ -4,6 +4,8 @@ let modoAtual = "eldorado";
 let paginaAtual = 1;
 
 const ITENS_POR_PAGINA = 150;
+const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
+const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
 
 const CONFIG = {
   eldorado: {
@@ -11,14 +13,24 @@ const CONFIG = {
     subtitulo: "Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.",
     logo: "Logos/Eldorado.png",
     tema: "tema-eldorado",
-    filtroTernura: false
+    filtroTernura: false,
+    filtroNovidade: false
   },
   ternura: {
     titulo: "Produtos Ternura",
     subtitulo: "Catálogo exclusivo da linha Produtos Ternura.",
     logo: "Logos/Produtos-Ternura.png",
     tema: "tema-ternura",
-    filtroTernura: true
+    filtroTernura: true,
+    filtroNovidade: false
+  },
+  novidades: {
+    titulo: "Novidades",
+    subtitulo: "Os 150 maiores códigos de produtos, destacados com selo de novidade.",
+    logo: "Logos/Eldorado.png",
+    tema: "tema-eldorado",
+    filtroTernura: false,
+    filtroNovidade: true
   }
 };
 
@@ -51,7 +63,8 @@ async function carregarProdutos() {
         estoque: Number(linha[5] || 0),
         imagem: String(linha[6] || "").trim(),
         codigoFornecedor: String(linha[7] || "").trim(),
-        fornecedor: String(linha[8] || "").trim()
+        fornecedor: String(linha[8] || "").trim(),
+        novidade: false
       }))
       .filter(produto =>
         produto.codigo ||
@@ -59,6 +72,7 @@ async function carregarProdutos() {
         produto.ean
       );
 
+    marcarNovidades();
     aplicarFiltros();
 
   } catch (erro) {
@@ -85,17 +99,46 @@ function dividirTermos(texto) {
     .filter(Boolean);
 }
 
+function codigoNumerico(produto) {
+  const codigo = String(produto.codigo || "").replace(/\D/g, "");
+  return Number(codigo || 0);
+}
+
+function marcarNovidades() {
+  const novidades = produtos
+    .filter(produto =>
+      codigoNumerico(produto) > 0 &&
+      !CODIGOS_EXCLUIDOS_NOVIDADES.includes(String(produto.codigo).trim())
+    )
+    .sort((a, b) => codigoNumerico(b) - codigoNumerico(a))
+    .slice(0, 150);
+
+  const codigosNovidades = new Set(
+    novidades.map(produto => String(produto.codigo).trim())
+  );
+
+  produtos.forEach(produto => {
+    produto.novidade = codigosNovidades.has(String(produto.codigo).trim());
+  });
+}
+
 function produtosDoModo() {
   const config = CONFIG[modoAtual];
 
-  if (!config.filtroTernura) {
-    return produtos;
+  let lista = produtos;
+
+  if (config.filtroTernura) {
+    lista = lista.filter(produto =>
+      normalizar(produto.descricao).includes("ternura") &&
+      !CODIGOS_EXCLUIDOS_TERNURA.includes(String(produto.codigo).trim())
+    );
   }
 
-  return produtos.filter(produto =>
-    normalizar(produto.descricao).includes("ternura") &&
-    String(produto.codigo).trim() !== "93217"
-  );
+  if (config.filtroNovidade) {
+    lista = lista.filter(produto => produto.novidade);
+  }
+
+  return lista;
 }
 
 function aplicarFiltroEstoque(lista) {
@@ -113,17 +156,14 @@ function aplicarFiltroEstoque(lista) {
 }
 
 function compararCodigo(a, b) {
-  const codigoA = normalizar(a.codigo);
-  const codigoB = normalizar(b.codigo);
-
-  const numeroA = Number(codigoA);
-  const numeroB = Number(codigoB);
+  const numeroA = codigoNumerico(a);
+  const numeroB = codigoNumerico(b);
 
   if (!isNaN(numeroA) && !isNaN(numeroB)) {
     return numeroA - numeroB;
   }
 
-  return codigoA.localeCompare(codigoB, "pt-BR", { numeric: true });
+  return normalizar(a.codigo).localeCompare(normalizar(b.codigo), "pt-BR", { numeric: true });
 }
 
 function ordenarProdutos(lista) {
@@ -463,11 +503,14 @@ function mostrarProdutos() {
       : "";
 
     card.innerHTML = `
-      ${
-        produto.imagem
-          ? `<img src="${caminhoImagem}" alt="${produto.descricao}" onerror="this.outerHTML='<div class=&quot;sem-imagem&quot;>Imagem não encontrada</div>'">`
-          : `<div class="sem-imagem">Sem imagem</div>`
-      }
+      <div class="card-imagem">
+        ${produto.novidade ? `<span class="selo-novidade">NOVIDADE</span>` : ""}
+        ${
+          produto.imagem
+            ? `<img src="${caminhoImagem}" alt="${produto.descricao}" onerror="this.outerHTML='<div class=&quot;sem-imagem&quot;>Imagem não encontrada</div>'">`
+            : `<div class="sem-imagem">Sem imagem</div>`
+        }
+      </div>
 
       <div class="codigo">Código: ${produto.codigo || "Não informado"}</div>
       <div class="descricao">${produto.descricao || "Descrição não informada"}</div>
@@ -573,6 +616,10 @@ document.getElementById("btnCatalogoEldorado").addEventListener("click", () => {
 
 document.getElementById("btnProdutosTernura").addEventListener("click", () => {
   trocarModo("ternura");
+});
+
+document.getElementById("btnNovidades").addEventListener("click", () => {
+  trocarModo("novidades");
 });
 
 document.addEventListener("click", function(event) {
