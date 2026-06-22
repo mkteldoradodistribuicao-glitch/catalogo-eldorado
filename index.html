@@ -3,106 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>Catálogo Eldorado</title>
-
-  <link rel="icon" type="image/png" href="Logos/Favicon.png" />
+  <link rel="icon" href="Logos/Favicon.png" />
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
-<body class="tema-eldorado">
-
-  <header class="topo">
-    <div class="topo-conteudo">
-      <img id="logoCatalogo" src="Logos/Eldorado.png" alt="Logo do catálogo" class="logo" />
-
-      <div class="titulo-area">
-        <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
-        <p id="subtituloCatalogo">Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.</p>
-      </div>
-
-      <button id="btnCotacao" class="cotacao-btn" type="button" aria-label="Abrir cotação">
-        🛒 <span id="contadorCotacao">0</span>
-      </button>
-
-      <button id="btnMenu" class="menu-btn" aria-label="Abrir menu">☰</button>
-    </div>
-
-    <nav id="menuLateral" class="menu-lateral">
-      <button id="btnCatalogoEldorado">Catálogo Eldorado</button>
-      <button id="btnProdutosTernura">Produtos Ternura</button>
-      <button id="btnNovidades">Novidades</button>
+<body>
+  <header>
+    <img id="logo" src="Logos/Eldorado.png" alt="Logo" />
+    <button id="menuBtn">☰</button>
+    <nav id="menu">
+      <button data-catalogo="eldorado">Catálogo Eldorado</button>
+      <button data-catalogo="ternura">Produtos Ternura</button>
     </nav>
+    <h1 id="titulo">Catálogo Eldorado</h1>
+    <p id="subtitulo">Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.</p>
   </header>
 
-  <main class="container">
-    <section class="filtros-area">
-      <div class="busca-area">
-        <input type="text" id="buscaPrincipal" placeholder="Buscar por código do produto, EAN ou descrição..." autocomplete="off" />
-        <input type="text" id="buscaCodigoFornecedor" placeholder="Código Fornecedor" autocomplete="off" />
-
-        <div class="campo-fornecedor">
-          <input type="text" id="buscaFornecedor" placeholder="Fornecedor" autocomplete="off" />
-          <div id="sugestoesFornecedor" class="sugestoes-fornecedor"></div>
-        </div>
+  <main>
+    <section class="filtros">
+      <input id="busca" placeholder="Código, EAN ou descrição" />
+      <input id="codFornecedor" placeholder="Cód. fornecedor" />
+      <div class="fornecedorBox">
+        <input id="fornecedor" placeholder="Fornecedor" autocomplete="off" />
+        <div id="sugestoes"></div>
       </div>
 
-      <div class="controles-area">
-        <div class="ordenacao-area">
-          <label for="ordenacao">Ordenar por:</label>
-          <select id="ordenacao">
-            <option value="descricao-az">Descrição A-Z</option>
-            <option value="descricao-za">Descrição Z-A</option>
-            <option value="codigo-crescente">Código do Produto Crescente</option>
-            <option value="codigo-decrescente">Código do Produto Decrescente</option>
-            <option value="maior-estoque">Maior Estoque</option>
-          </select>
-        </div>
+      <select id="estoqueFiltro">
+        <option value="com">Apenas produtos com estoque</option>
+        <option value="sem">Apenas produtos sem estoque</option>
+        <option value="todos">Todos os produtos</option>
+      </select>
 
-        <div class="estoque-area">
-          <label for="filtroEstoque">Estoque:</label>
-          <select id="filtroEstoque">
-            <option value="com-estoque" selected>Apenas Produtos com Estoque</option>
-            <option value="sem-estoque">Apenas Produtos sem Estoque</option>
-            <option value="todos">Todos os Produtos</option>
-          </select>
-        </div>
+      <select id="ordenacao">
+        <option value="codigoAsc">Código crescente</option>
+        <option value="codigoDesc">Código decrescente</option>
+        <option value="descAsc">Descrição A-Z</option>
+        <option value="descDesc">Descrição Z-A</option>
+        <option value="estoqueDesc">Maior estoque</option>
+      </select>
 
-        <button id="btnLimparFiltros" class="btn-limpar" type="button">Limpar Filtros</button>
-      </div>
+      <button id="limpar">Limpar filtros</button>
     </section>
 
-    <div id="contador"></div>
-    <section id="catalogo"></section>
-    <div id="paginacao" class="paginacao"></div>
+    <section id="mensagem"></section>
+    <section id="produtos"></section>
+
+    <section class="paginacao">
+      <button id="anterior">Anterior</button>
+      <span id="paginaInfo"></span>
+      <button id="proxima">Próxima</button>
+    </section>
   </main>
 
-  <aside id="painelCotacao" class="painel-cotacao">
-    <div class="painel-cabecalho">
-      <h2>Lista de Cotação</h2>
-      <button id="fecharCotacao" type="button">×</button>
-    </div>
+  <button id="cotacaoFloat">🛒 <span id="cotacaoQtd">0</span></button>
 
-    <div class="dados-pdf">
-      <label for="nomePdf">Razão Social ou Comprador Responsável:</label>
-      <input type="text" id="nomePdf" placeholder="Ex.: Supermercado São João" autocomplete="off" />
+  <aside id="cotacaoPainel">
+    <div class="cotacaoTopo">
+      <h2>Cotação</h2>
+      <button id="fecharCotacao">×</button>
     </div>
-
-    <div id="listaCotacao" class="lista-cotacao"></div>
-
-    <div class="acoes-cotacao">
-      <button id="copiarCotacao" type="button">Copiar Cotação</button>
-      <button id="gerarPdf" type="button">Gerar Cotação em PDF</button>
-      <button id="limparCotacao" type="button" class="botao-perigo">Limpar Cotação</button>
-    </div>
+    <div id="cotacaoLista"></div>
   </aside>
 
-  <div id="overlayCotacao" class="overlay-cotacao"></div>
+  <div id="toast"></div>
 
-  <button id="btnTopo" class="btn-topo" aria-label="Voltar ao topo">↑</button>
-
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
