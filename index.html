@@ -20,6 +20,10 @@
         <p id="subtituloCatalogo">Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.</p>
       </div>
 
+      <button id="btnCotacao" class="cotacao-btn" type="button" aria-label="Abrir cotação">
+        🛒 <span id="contadorCotacao">0</span>
+      </button>
+
       <button id="btnMenu" class="menu-btn" aria-label="Abrir menu">☰</button>
     </div>
 
@@ -33,27 +37,11 @@
   <main class="container">
     <section class="filtros-area">
       <div class="busca-area">
-        <input
-          type="text"
-          id="buscaPrincipal"
-          placeholder="Buscar por código do produto, EAN ou descrição..."
-          autocomplete="off"
-        />
-
-        <input
-          type="text"
-          id="buscaCodigoFornecedor"
-          placeholder="Código Fornecedor"
-          autocomplete="off"
-        />
+        <input type="text" id="buscaPrincipal" placeholder="Buscar por código do produto, EAN ou descrição..." autocomplete="off" />
+        <input type="text" id="buscaCodigoFornecedor" placeholder="Código Fornecedor" autocomplete="off" />
 
         <div class="campo-fornecedor">
-          <input
-            type="text"
-            id="buscaFornecedor"
-            placeholder="Fornecedor"
-            autocomplete="off"
-          />
+          <input type="text" id="buscaFornecedor" placeholder="Fornecedor" autocomplete="off" />
           <div id="sugestoesFornecedor" class="sugestoes-fornecedor"></div>
         </div>
       </div>
@@ -79,20 +67,42 @@
           </select>
         </div>
 
-        <button id="btnLimparFiltros" class="btn-limpar" type="button">
-          Limpar Filtros
-        </button>
+        <button id="btnLimparFiltros" class="btn-limpar" type="button">Limpar Filtros</button>
       </div>
     </section>
 
     <div id="contador"></div>
-
     <section id="catalogo"></section>
-
     <div id="paginacao" class="paginacao"></div>
   </main>
 
+  <aside id="painelCotacao" class="painel-cotacao">
+    <div class="painel-cabecalho">
+      <h2>Lista de Cotação</h2>
+      <button id="fecharCotacao" type="button">×</button>
+    </div>
+
+    <div class="dados-pdf">
+      <label for="nomePdf">Razão Social ou Comprador Responsável:</label>
+      <input type="text" id="nomePdf" placeholder="Ex.: Supermercado São João" autocomplete="off" />
+    </div>
+
+    <div id="listaCotacao" class="lista-cotacao"></div>
+
+    <div class="acoes-cotacao">
+      <button id="copiarCotacao" type="button">Copiar Cotação</button>
+      <button id="gerarPdf" type="button">Gerar Cotação em PDF</button>
+      <button id="limparCotacao" type="button" class="botao-perigo">Limpar Cotação</button>
+    </div>
+  </aside>
+
+  <div id="overlayCotacao" class="overlay-cotacao"></div>
+
+  <button id="btnTopo" class="btn-topo" aria-label="Voltar ao topo">↑</button>
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

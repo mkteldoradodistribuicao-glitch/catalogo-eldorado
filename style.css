@@ -81,16 +81,38 @@ body.tema-ternura {
   opacity: 0.95;
 }
 
-.menu-btn {
+.menu-btn,
+.cotacao-btn {
   background: white;
   color: var(--cor-principal);
   border: none;
-  font-size: 28px;
+  font-size: 24px;
   width: 46px;
   height: 46px;
   border-radius: 10px;
   cursor: pointer;
   font-weight: bold;
+}
+
+.cotacao-btn {
+  position: relative;
+  font-size: 21px;
+}
+
+.cotacao-btn span {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  background: var(--cor-secundaria);
+  color: white;
+  min-width: 22px;
+  height: 22px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .menu-lateral {
@@ -278,6 +300,7 @@ body.tema-ternura {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   border-top: 4px solid var(--cor-principal);
   backdrop-filter: blur(4px);
+  position: relative;
 }
 
 .card:hover {
@@ -348,6 +371,7 @@ body.tema-ternura {
   border-radius: 20px;
   font-size: 12px;
   font-weight: bold;
+  max-width: calc(100% - 48px);
 }
 
 .sem-imagem {
@@ -360,6 +384,25 @@ body.tema-ternura {
   color: #777;
   border-radius: 10px;
   font-size: 13px;
+}
+
+.btn-adicionar-cotacao {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: var(--cor-principal);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgba(0,0,0,0.18);
+}
+
+.btn-adicionar-cotacao:hover {
+  transform: scale(1.06);
 }
 
 .paginacao {
@@ -391,24 +434,202 @@ body.tema-ternura {
   color: var(--cor-principal);
 }
 
+.overlay-cotacao {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 900;
+}
+
+.overlay-cotacao.aberto {
+  display: block;
+}
+
+.painel-cotacao {
+  position: fixed;
+  top: 0;
+  right: -430px;
+  width: 410px;
+  max-width: 92vw;
+  height: 100vh;
+  background: white;
+  z-index: 1000;
+  box-shadow: -8px 0 24px rgba(0,0,0,0.22);
+  padding: 18px;
+  transition: right 0.25s ease;
+  overflow-y: auto;
+}
+
+.painel-cotacao.aberto {
+  right: 0;
+}
+
+.painel-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.painel-cabecalho h2 {
+  margin: 0;
+  color: var(--cor-principal);
+  font-size: 22px;
+}
+
+.painel-cabecalho button {
+  border: none;
+  background: #f1f1f1;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.dados-pdf {
+  margin: 18px 0;
+}
+
+.dados-pdf label {
+  display: block;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--cor-principal);
+  margin-bottom: 6px;
+}
+
+.dados-pdf input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d0d0d0;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.lista-cotacao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item-cotacao {
+  border: 1px solid #e2e2e2;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.item-cotacao strong {
+  color: var(--cor-principal);
+  font-size: 14px;
+}
+
+.item-cotacao p {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #444;
+}
+
+.item-cotacao-acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.item-cotacao-acoes label {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.item-cotacao-acoes input {
+  width: 80px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.item-cotacao-acoes button {
+  border: none;
+  background: #e8e8e8;
+  color: #333;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.acoes-cotacao {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.acoes-cotacao button {
+  padding: 13px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--cor-principal);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.acoes-cotacao .botao-perigo {
+  background: #a83232;
+}
+
+.btn-topo {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: var(--cor-principal);
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.20);
+  z-index: 800;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.25s ease;
+}
+
+.btn-topo.visivel {
+  opacity: 1;
+  visibility: visible;
+}
+
 @media (max-width: 700px) {
+  .topo-conteudo {
+    gap: 10px;
+  }
+
   .logo {
     height: 76px;
-    max-width: 180px;
+    max-width: 160px;
   }
 
   .titulo-area h1 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .titulo-area p {
-    font-size: 12px;
+    font-size: 11px;
   }
 
-  .menu-btn {
+  .menu-btn,
+  .cotacao-btn {
     width: 42px;
     height: 42px;
-    font-size: 24px;
+    font-size: 20px;
   }
 
   .menu-lateral {
@@ -456,5 +677,16 @@ body.tema-ternura {
 
   .paginacao button {
     width: 100%;
+  }
+
+  .painel-cotacao {
+    width: 92vw;
+  }
+
+  .btn-topo {
+    width: 48px;
+    height: 48px;
+    bottom: 18px;
+    right: 18px;
   }
 }
