@@ -1,101 +1,108 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Catálogo Eldorado</title>
-  <link rel="icon" href="Logos/Favicon.png">
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <link rel="icon" type="image/png" href="Logos/Favicon.png" />
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="tema-eldorado">
+
   <header class="topo">
-    <div class="topo-acoes">
-      <button id="btnCarrinhoTopo" class="btn-icon" title="Abrir cotação">
-        🛒 <span id="contadorTopo">0</span>
+    <div class="topo-conteudo">
+      <img id="logoCatalogo" src="Logos/Eldorado.png" alt="Logo do catálogo" class="logo" />
+
+      <div class="titulo-area">
+        <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
+        <p id="subtituloCatalogo">Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.</p>
+      </div>
+
+      <button id="btnCotacao" class="cotacao-btn" type="button" aria-label="Abrir cotação">
+        🛒 <span id="contadorCotacao">0</span>
       </button>
-      <button id="btnMenu" class="btn-icon" title="Menu">☰</button>
 
-      <nav id="menuSuspenso" class="menu-suspenso">
-        <button data-menu="catalogo">Catálogo Eldorado</button>
-        <button data-menu="ternura">Produtos Ternura</button>
-        <button data-menu="novidades">Novidades</button>
-      </nav>
+      <button id="btnMenu" class="menu-btn" aria-label="Abrir menu">☰</button>
     </div>
 
-    <img id="logoCatalogo" src="Logos/Eldorado.png" alt="Logo do catálogo" class="logo">
-
-    <div class="titulo-box">
-      <span id="seloModo" class="selo-modo">Catálogo Comercial</span>
-      <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
-      <p id="subtituloCatalogo">Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.</p>
-    </div>
+    <nav id="menuLateral" class="menu-lateral">
+      <button id="btnCatalogoEldorado">Catálogo Eldorado</button>
+      <button id="btnProdutosTernura">Produtos Ternura</button>
+      <button id="btnNovidades">Novidades</button>
+    </nav>
   </header>
 
-  <main>
-    <section class="filtros">
-      <div class="campo-busca">
-        <input id="buscaPrincipal" type="text" placeholder="Ex.: papel 30, fralda ternura g, sabao 1l">
-        <div id="sugestoesBusca" class="sugestoes"></div>
+  <main class="container">
+    <section class="filtros-area">
+      <div class="busca-area">
+        <input type="text" id="buscaPrincipal" placeholder="Buscar por código do produto, EAN ou descrição..." autocomplete="off" />
+        <input type="text" id="buscaCodigoFornecedor" placeholder="Código Fornecedor" autocomplete="off" />
+
+        <div class="campo-fornecedor">
+          <input type="text" id="buscaFornecedor" placeholder="Fornecedor" autocomplete="off" />
+          <div id="sugestoesFornecedor" class="sugestoes-fornecedor"></div>
+        </div>
       </div>
 
-      <input id="buscaCodFornecedor" type="text" placeholder="Cód. fornecedor">
+      <div class="controles-area">
+        <div class="ordenacao-area">
+          <label for="ordenacao">Ordenar por:</label>
+          <select id="ordenacao">
+            <option value="descricao-az">Descrição A-Z</option>
+            <option value="descricao-za">Descrição Z-A</option>
+            <option value="codigo-crescente">Código do Produto Crescente</option>
+            <option value="codigo-decrescente">Código do Produto Decrescente</option>
+            <option value="maior-estoque">Maior Estoque</option>
+          </select>
+        </div>
 
-      <div class="campo-fornecedor">
-        <input id="buscaFornecedor" type="text" placeholder="Fornecedor" autocomplete="off">
-        <div id="sugestoesFornecedor" class="sugestoes"></div>
+        <div class="estoque-area">
+          <label for="filtroEstoque">Estoque:</label>
+          <select id="filtroEstoque">
+            <option value="com-estoque" selected>Apenas Produtos com Estoque</option>
+            <option value="sem-estoque">Apenas Produtos sem Estoque</option>
+            <option value="todos">Todos os Produtos</option>
+          </select>
+        </div>
+
+        <button id="btnLimparFiltros" class="btn-limpar" type="button">Limpar Filtros</button>
       </div>
-
-      <select id="filtroEstoque">
-        <option value="com">Apenas Produtos com Estoque</option>
-        <option value="sem">Apenas Produtos sem Estoque</option>
-        <option value="todos">Todos os Produtos</option>
-      </select>
-
-      <select id="ordenacao">
-        <option value="relevancia">Mais compatíveis</option>
-        <option value="codigoAsc">Código Crescente</option>
-        <option value="codigoDesc">Código Decrescente</option>
-        <option value="descricaoAsc">Descrição A-Z</option>
-        <option value="descricaoDesc">Descrição Z-A</option>
-        <option value="estoqueDesc">Maior Estoque</option>
-      </select>
-
-      <button id="btnLimparFiltros">Limpar Filtros</button>
     </section>
 
-    <section id="historicoBusca" class="historico-busca"></section>
-    <section id="areaNovidades" class="area-novidades"></section>
-    <section id="mensagemResultado" class="mensagem"></section>
-    <section id="paginacaoTopo" class="paginacao"></section>
-    <section id="listaProdutos" class="produtos"></section>
-    <section id="paginacaoBase" class="paginacao"></section>
+    <div id="contador"></div>
+    <section id="catalogo"></section>
+    <div id="paginacao" class="paginacao"></div>
   </main>
 
-  <button id="btnCarrinhoFlutuante" class="flutuante carrinho-flutuante" title="Abrir cotação">
-    🛒 <span id="contadorFlutuante">0</span>
-  </button>
-
-  <button id="btnTopo" class="flutuante topo-flutuante" title="Voltar ao topo">↑</button>
-
   <aside id="painelCotacao" class="painel-cotacao">
-    <div class="cotacao-header">
-      <h2>Cotação</h2>
-      <button id="btnFecharCotacao">×</button>
+    <div class="painel-cabecalho">
+      <h2>Lista de Cotação</h2>
+      <button id="fecharCotacao" type="button">×</button>
+    </div>
+
+    <div class="dados-pdf">
+      <label for="nomePdf">Razão Social ou Comprador Responsável:</label>
+      <input type="text" id="nomePdf" placeholder="Ex.: Supermercado São João" autocomplete="off" />
     </div>
 
     <div id="listaCotacao" class="lista-cotacao"></div>
 
-    <div class="cotacao-acoes">
-      <button id="btnCopiarCotacao">Copiar Cotação</button>
-      <button id="btnGerarPdf">Gerar Cotação em PDF</button>
-      <button id="btnLimparCotacao" class="btn-perigo">Limpar Lista</button>
+    <div class="acoes-cotacao">
+      <button id="copiarCotacao" type="button">Copiar Cotação</button>
+      <button id="gerarPdf" type="button">Gerar Cotação em PDF</button>
+      <button id="limparCotacao" type="button" class="botao-perigo">Limpar Cotação</button>
     </div>
   </aside>
 
-  <div id="toast" class="toast"></div>
+  <div id="overlayCotacao" class="overlay-cotacao"></div>
 
+  <button id="btnTopo" class="btn-topo" aria-label="Voltar ao topo">↑</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

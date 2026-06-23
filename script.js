@@ -1,745 +1,863 @@
 let produtos = [];
 let produtosFiltrados = [];
 let cotacao = [];
+let modoAtual = "eldorado";
 let paginaAtual = 1;
-let menuAtual = "catalogo";
-let ultimasBuscas = JSON.parse(localStorage.getItem("ultimasBuscasCatalogo") || "[]");
 
-const produtosPorPagina = 150;
-const codigosOcultosTernura = ["93217", "89817"];
-const codigosIgnoradosNovidades = ["999999", "116451"];
+const ITENS_POR_PAGINA = 150;
+const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
+const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
 
-const colunas = {
-  codigo: 0,
-  ean: 1,
-  descricao: 2,
-  embalagem: 3,
-  qtdMaster: 4,
-  estoque: 5,
-  imagem: 6,
-  codFornecedor: 7,
-  fornecedor: 8
+const CONFIG = {
+  eldorado: {
+    titulo: "Catálogo Eldorado",
+    subtitulo: "Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.",
+    logo: "Logos/Eldorado.png",
+    tema: "tema-eldorado",
+    filtroTernura: false,
+    filtroNovidade: false
+  },
+  ternura: {
+    titulo: "Produtos Ternura",
+    subtitulo: "Catálogo exclusivo da linha Produtos Ternura.",
+    logo: "Logos/Produtos-Ternura.png",
+    tema: "tema-ternura",
+    filtroTernura: true,
+    filtroNovidade: false
+  },
+  novidades: {
+    titulo: "Novidades",
+    subtitulo: "Os 150 maiores códigos de produtos, destacados com selo de novidade.",
+    logo: "Logos/Eldorado.png",
+    tema: "tema-eldorado",
+    filtroTernura: false,
+    filtroNovidade: true
+  }
 };
 
-const sinonimosBusca = {
-  fh: ["papel", "higienico"],
-  ph: ["papel", "higienico"],
-  pt: ["papel", "toalha"],
-  fg: ["fralda", "geriatrica"],
-  fb: ["fralda", "baby"],
-  fradla: ["fralda"],
-  higienco: ["higienico"],
-  higiênico: ["higienico"],
-  sabao: ["sabao", "sabão"],
-  deterg: ["detergente"],
-  amac: ["amaciante"]
-};
+async function carregarProdutos() {
+  try {
+    const resposta = await fetch("Produtos.xlsx");
 
-const $ = id => document.getElementById(id);
+    if (!resposta.ok) {
+      throw new Error("Planilha não encontrada.");
+    }
 
-function texto(valor) {
-  return String(valor ?? "").trim();
+    const arquivo = await resposta.arrayBuffer();
+    const workbook = XLSX.read(arquivo, { type: "array" });
+    const planilha = workbook.Sheets[workbook.SheetNames[0]];
+
+    const dados = XLSX.utils.sheet_to_json(planilha, {
+      header: 1,
+      defval: ""
+    });
+
+    const linhas = dados.slice(1);
+
+    produtos = linhas
+      .map(linha => ({
+        codigo: String(linha[0] || "").trim(),
+        ean: String(linha[1] || "").trim(),
+        descricao: String(linha[2] || "").trim(),
+        embalagem: String(linha[3] || "").trim(),
+        qtdMaster: String(linha[4] || "").trim(),
+        estoque: Number(linha[5] || 0),
+        imagem: String(linha[6] || "").trim(),
+        codigoFornecedor: String(linha[7] || "").trim(),
+        fornecedor: String(linha[8] || "").trim(),
+        novidade: false
+      }))
+      .filter(produto =>
+        produto.codigo ||
+        produto.descricao ||
+        produto.ean
+      );
+
+    marcarNovidades();
+    carregarCotacaoSalva();
+    aplicarFiltros();
+
+  } catch (erro) {
+    document.getElementById("contador").innerText = "";
+    document.getElementById("catalogo").innerHTML =
+      "<p>Não foi possível carregar a planilha de produtos.</p>";
+    console.error(erro);
+  }
 }
 
-function normalizar(valor) {
-  return texto(valor)
+function normalizar(texto) {
+  return String(texto || "")
+    .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    .trim();
 }
 
-function numero(valor) {
-  const n = Number(String(valor ?? "0").replace(",", "."));
-  return isNaN(n) ? 0 : n;
+function dividirTermos(texto) {
+  return normalizar(texto)
+    .replace(/^%+/, "")
+    .split(/\s+|%+/)
+    .map(t => t.trim())
+    .filter(Boolean);
 }
 
-function tokensBusca(busca) {
-  const limpo = normalizar(busca).replace(/%/g, " ");
-  let tokens = limpo.split(/\s+/).filter(Boolean);
-  let expandidos = [];
+function codigoNumerico(produto) {
+  const codigo = String(produto.codigo || "").replace(/\D/g, "");
+  return Number(codigo || 0);
+}
 
-  tokens.forEach(t => {
-    expandidos.push(t);
-    if (sinonimosBusca[t]) expandidos.push(...sinonimosBusca[t]);
+function marcarNovidades() {
+  const novidades = produtos
+    .filter(produto =>
+      codigoNumerico(produto) > 0 &&
+      !CODIGOS_EXCLUIDOS_NOVIDADES.includes(String(produto.codigo).trim())
+    )
+    .sort((a, b) => codigoNumerico(b) - codigoNumerico(a))
+    .slice(0, 150);
+
+  const codigosNovidades = new Set(
+    novidades.map(produto => String(produto.codigo).trim())
+  );
+
+  produtos.forEach(produto => {
+    produto.novidade = codigosNovidades.has(String(produto.codigo).trim());
   });
-
-  return [...new Set(expandidos)];
 }
 
-function basePesquisaProduto(p) {
-  return normalizar([
-    p.codigo,
-    p.ean,
-    p.descricao,
-    p.embalagem,
-    p.qtdMaster,
-    p.codFornecedor,
-    p.fornecedor
-  ].join(" "));
-}
+function produtosDoModo() {
+  const config = CONFIG[modoAtual];
+  let lista = produtos;
 
-function camposPesquisa(p) {
-  return {
-    codigo: normalizar(p.codigo),
-    ean: normalizar(p.ean),
-    descricao: normalizar(p.descricao),
-    embalagem: normalizar(p.embalagem),
-    qtdMaster: normalizar(p.qtdMaster),
-    codFornecedor: normalizar(p.codFornecedor),
-    fornecedor: normalizar(p.fornecedor),
-    tudo: basePesquisaProduto(p)
-  };
-}
-
-fetch("Produtos.xlsx")
-  .then(resposta => resposta.arrayBuffer())
-  .then(buffer => {
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const linhas = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-    produtos = linhas.slice(1).map(linha => ({
-      codigo: texto(linha[colunas.codigo]),
-      ean: texto(linha[colunas.ean]),
-      descricao: texto(linha[colunas.descricao]),
-      embalagem: texto(linha[colunas.embalagem]),
-      qtdMaster: numero(linha[colunas.qtdMaster]) || 1,
-      estoque: numero(linha[colunas.estoque]),
-      imagem: texto(linha[colunas.imagem]),
-      codFornecedor: texto(linha[colunas.codFornecedor]),
-      fornecedor: texto(linha[colunas.fornecedor])
-    })).filter(p => p.codigo && p.descricao);
-
-    aplicarFiltros();
-  })
-  .catch(() => {
-    $("mensagemResultado").innerHTML =
-      "Erro ao carregar a planilha Produtos.xlsx. Verifique se o arquivo está na raiz do projeto.";
-  });
-
-function produtosBase() {
-  if (menuAtual === "ternura") {
-    return produtos.filter(p =>
-      normalizar(p.descricao).includes("ternura") &&
-      !codigosOcultosTernura.includes(p.codigo)
+  if (config.filtroTernura) {
+    lista = lista.filter(produto =>
+      normalizar(produto.descricao).includes("ternura") &&
+      !CODIGOS_EXCLUIDOS_TERNURA.includes(String(produto.codigo).trim())
     );
   }
 
-  if (menuAtual === "novidades") return obterNovidades();
+  if (config.filtroNovidade) {
+    lista = lista.filter(produto => produto.novidade);
+  }
 
-  return [...produtos];
+  return lista;
 }
 
-function obterNovidades() {
-  return [...produtos]
-    .filter(p => !codigosIgnoradosNovidades.includes(p.codigo))
-    .sort((a, b) => numero(b.codigo) - numero(a.codigo))
-    .slice(0, 150);
+function aplicarFiltroEstoque(lista) {
+  const tipo = document.getElementById("filtroEstoque").value;
+
+  if (tipo === "com-estoque") {
+    return lista.filter(produto => Number(produto.estoque || 0) > 0);
+  }
+
+  if (tipo === "sem-estoque") {
+    return lista.filter(produto => Number(produto.estoque || 0) <= 0);
+  }
+
+  return lista;
 }
 
-function ehNovidade(produto) {
-  return obterNovidades().some(p => p.codigo === produto.codigo);
+function compararCodigo(a, b) {
+  const numeroA = codigoNumerico(a);
+  const numeroB = codigoNumerico(b);
+
+  if (!isNaN(numeroA) && !isNaN(numeroB)) {
+    return numeroA - numeroB;
+  }
+
+  return normalizar(a.codigo).localeCompare(normalizar(b.codigo), "pt-BR", { numeric: true });
+}
+
+function ordenarProdutos(lista) {
+  const tipoOrdenacao = document.getElementById("ordenacao").value;
+  const listaOrdenada = [...lista];
+
+  switch (tipoOrdenacao) {
+    case "codigo-crescente":
+      listaOrdenada.sort((a, b) => compararCodigo(a, b));
+      break;
+    case "codigo-decrescente":
+      listaOrdenada.sort((a, b) => compararCodigo(b, a));
+      break;
+    case "descricao-az":
+      listaOrdenada.sort((a, b) =>
+        normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR")
+      );
+      break;
+    case "descricao-za":
+      listaOrdenada.sort((a, b) =>
+        normalizar(b.descricao).localeCompare(normalizar(a.descricao), "pt-BR")
+      );
+      break;
+    case "maior-estoque":
+      listaOrdenada.sort((a, b) => b.estoque - a.estoque);
+      break;
+  }
+
+  return listaOrdenada;
+}
+
+function calcularDistancia(a, b) {
+  a = normalizar(a);
+  b = normalizar(b);
+
+  const matriz = Array.from({ length: b.length + 1 }, (_, i) => [i]);
+
+  for (let j = 0; j <= a.length; j++) {
+    matriz[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      matriz[i][j] = b.charAt(i - 1) === a.charAt(j - 1)
+        ? matriz[i - 1][j - 1]
+        : Math.min(
+            matriz[i - 1][j - 1] + 1,
+            matriz[i][j - 1] + 1,
+            matriz[i - 1][j] + 1
+          );
+    }
+  }
+
+  return matriz[b.length][a.length];
+}
+
+function pontuarFornecedor(nomeFornecedor, termoBusca, estoqueTotal) {
+  const fornecedor = normalizar(nomeFornecedor);
+  const busca = normalizar(termoBusca);
+
+  if (!busca) return 0;
+
+  let pontos = 0;
+
+  if (fornecedor === busca) pontos += 1000;
+  if (fornecedor.startsWith(busca)) pontos += 700;
+  if (fornecedor.includes(busca)) pontos += 500;
+
+  const termos = dividirTermos(termoBusca);
+
+  termos.forEach(termo => {
+    if (fornecedor.includes(termo)) pontos += 250;
+    if (fornecedor.startsWith(termo)) pontos += 300;
+
+    const palavras = fornecedor.split(/\s+/).filter(Boolean);
+
+    palavras.forEach(palavra => {
+      if (palavra.startsWith(termo)) pontos += 220;
+
+      const distancia = calcularDistancia(palavra, termo);
+      pontos += Math.max(0, 140 - distancia * 25);
+    });
+  });
+
+  pontos += Math.min(estoqueTotal, 10000) * 0.01;
+
+  return pontos;
+}
+
+function obterSugestoesFornecedor() {
+  const termo = document.getElementById("buscaFornecedor").value;
+  const termoNormalizado = normalizar(termo);
+
+  if (!termoNormalizado) {
+    return [];
+  }
+
+  const base = aplicarFiltroEstoque(produtosDoModo());
+  const mapaFornecedores = new Map();
+
+  base.forEach(produto => {
+    if (!produto.fornecedor) return;
+
+    const chave = normalizar(produto.fornecedor);
+
+    if (!mapaFornecedores.has(chave)) {
+      mapaFornecedores.set(chave, {
+        nome: produto.fornecedor,
+        estoqueTotal: 0,
+        quantidadeProdutos: 0
+      });
+    }
+
+    const fornecedor = mapaFornecedores.get(chave);
+    fornecedor.estoqueTotal += Number(produto.estoque || 0);
+    fornecedor.quantidadeProdutos += 1;
+  });
+
+  return [...mapaFornecedores.values()]
+    .map(fornecedor => ({
+      ...fornecedor,
+      pontos: pontuarFornecedor(fornecedor.nome, termo, fornecedor.estoqueTotal)
+    }))
+    .filter(fornecedor => fornecedor.pontos > 0)
+    .sort((a, b) => {
+      if (b.pontos !== a.pontos) return b.pontos - a.pontos;
+      if (b.estoqueTotal !== a.estoqueTotal) return b.estoqueTotal - a.estoqueTotal;
+      return normalizar(a.nome).localeCompare(normalizar(b.nome), "pt-BR");
+    })
+    .slice(0, 5);
+}
+
+function mostrarSugestoesFornecedor() {
+  const container = document.getElementById("sugestoesFornecedor");
+  const sugestoes = obterSugestoesFornecedor();
+
+  container.innerHTML = "";
+
+  if (!sugestoes.length) {
+    container.classList.remove("ativo");
+    return;
+  }
+
+  sugestoes.forEach(sugestao => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "sugestao-item";
+    item.innerHTML = `
+      <strong>${sugestao.nome}</strong>
+      <span>${sugestao.quantidadeProdutos} produtos</span>
+    `;
+
+    item.addEventListener("click", () => {
+      document.getElementById("buscaFornecedor").value = sugestao.nome;
+      container.classList.remove("ativo");
+      paginaAtual = 1;
+      aplicarFiltros();
+    });
+
+    container.appendChild(item);
+  });
+
+  container.classList.add("ativo");
+}
+
+function fornecedorCombina(produtoFornecedor, buscaFornecedor) {
+  const termos = dividirTermos(buscaFornecedor);
+  const fornecedor = normalizar(produtoFornecedor);
+
+  if (!termos.length) return true;
+
+  return termos.every(termo => {
+    if (fornecedor.includes(termo)) return true;
+
+    const palavrasFornecedor = fornecedor.split(/\s+/).filter(Boolean);
+
+    return palavrasFornecedor.some(palavra => {
+      const distancia = calcularDistancia(palavra, termo);
+      return palavra.startsWith(termo) || distancia <= 2;
+    });
+  });
+}
+
+function produtoCombinaPrincipal(produto, buscaPrincipal, permitirBuscaLivre) {
+  const busca = normalizar(buscaPrincipal);
+  const termos = dividirTermos(buscaPrincipal);
+
+  if (!termos.length) return true;
+
+  const codigo = normalizar(produto.codigo);
+  const ean = normalizar(produto.ean);
+  const descricao = normalizar(produto.descricao);
+  const primeiraPalavra = termos[0];
+
+  const codigoOuEanCombina = termos.every(termo =>
+    codigo.includes(termo) || ean.includes(termo)
+  );
+
+  if (codigoOuEanCombina) return true;
+
+  const descricaoContemTodos = termos.every(termo =>
+    descricao.includes(termo)
+  );
+
+  if (!descricaoContemTodos) return false;
+
+  if (permitirBuscaLivre || busca.startsWith("%")) {
+    return true;
+  }
+
+  return descricao.startsWith(primeiraPalavra);
+}
+
+function aplicarBuscaPrincipalComPrioridade(lista, buscaPrincipal) {
+  const termos = dividirTermos(buscaPrincipal);
+
+  if (!termos.length) return lista;
+
+  const buscaLivre = normalizar(buscaPrincipal).startsWith("%");
+
+  const resultadoPrioritario = lista.filter(produto =>
+    produtoCombinaPrincipal(produto, buscaPrincipal, buscaLivre)
+  );
+
+  if (resultadoPrioritario.length > 0) {
+    return resultadoPrioritario;
+  }
+
+  return lista.filter(produto =>
+    produtoCombinaPrincipal(produto, buscaPrincipal, true)
+  );
+}
+
+function gerarMensagemSemResultado() {
+  const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
+  const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value.trim();
+  const buscaFornecedor = document.getElementById("buscaFornecedor").value.trim();
+
+  const partes = [];
+
+  if (buscaPrincipal) partes.push(`"${buscaPrincipal}"`);
+  if (buscaCodigoFornecedor) partes.push(`código de fornecedor "${buscaCodigoFornecedor}"`);
+  if (buscaFornecedor) partes.push(`fornecedor "${buscaFornecedor}"`);
+
+  if (!partes.length) return "Nenhum produto encontrado.";
+  if (partes.length === 1) return `Nenhum produto encontrado para ${partes[0]}.`;
+  if (partes.length === 2) return `Nenhum produto encontrado para ${partes[0]} dentro de ${partes[1]}.`;
+
+  return `Nenhum produto encontrado para ${partes[0]} no ${partes[1]} e ${partes[2]}.`;
 }
 
 function aplicarFiltros() {
-  let lista = produtosBase();
+  const buscaPrincipal = document.getElementById("buscaPrincipal").value;
+  const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value;
+  const buscaFornecedor = document.getElementById("buscaFornecedor").value;
 
-  const busca = texto($("buscaPrincipal").value);
-  const codFornecedor = normalizar($("buscaCodFornecedor").value);
-  const fornecedor = normalizar($("buscaFornecedor").value);
-  const estoque = $("filtroEstoque").value;
+  const termosCodigoFornecedor = dividirTermos(buscaCodigoFornecedor);
 
-  lista = filtrarBuscaInteligente(lista, busca);
+  let resultado = produtosDoModo();
 
-  if (codFornecedor) {
-    lista = lista.filter(p => normalizar(p.codFornecedor).includes(codFornecedor));
-  }
+  resultado = aplicarFiltroEstoque(resultado);
 
-  if (fornecedor) {
-    lista = lista.filter(p => normalizar(p.fornecedor).includes(fornecedor));
-  }
+  resultado = resultado.filter(produto => {
+    const textoCodigoFornecedor = normalizar(produto.codigoFornecedor);
 
-  if (estoque === "com") lista = lista.filter(p => p.estoque > 0);
-  if (estoque === "sem") lista = lista.filter(p => p.estoque <= 0);
+    const encontrouCodigoFornecedor = termosCodigoFornecedor.every(termo =>
+      textoCodigoFornecedor.includes(termo)
+    );
 
-  ordenarProdutos(lista, busca);
+    const encontrouFornecedor = fornecedorCombina(produto.fornecedor, buscaFornecedor);
 
-  produtosFiltrados = lista;
+    return encontrouCodigoFornecedor && encontrouFornecedor;
+  });
+
+  resultado = aplicarBuscaPrincipalComPrioridade(resultado, buscaPrincipal);
+  resultado = ordenarProdutos(resultado);
+
+  produtosFiltrados = resultado;
   paginaAtual = 1;
 
-  renderizarProdutos();
-  renderizarNovidades();
-  renderizarHistoricoBusca();
+  mostrarProdutos();
 }
 
-function filtrarBuscaInteligente(lista, busca) {
-  const termoOriginal = texto(busca);
-  if (!termoOriginal) return lista;
+function mostrarProdutos() {
+  const catalogo = document.getElementById("catalogo");
+  const contador = document.getElementById("contador");
+  const paginacao = document.getElementById("paginacao");
 
-  const termo = normalizar(termoOriginal);
-  const tokens = tokensBusca(termoOriginal);
+  catalogo.innerHTML = "";
+  paginacao.innerHTML = "";
 
-  const resultados = lista.map(p => {
-    const campos = camposPesquisa(p);
-    let pontos = 0;
-    let encontrados = 0;
+  const totalProdutos = produtosFiltrados.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalProdutos / ITENS_POR_PAGINA));
 
-    if (campos.codigo === termo) pontos += 1000;
-    if (campos.ean === termo) pontos += 1000;
-    if (campos.descricao === termo) pontos += 850;
-    if (campos.descricao.startsWith(termo)) pontos += 700;
-    if (campos.descricao.includes(termo)) pontos += 420;
-    if (campos.tudo.includes(termo)) pontos += 180;
+  if (paginaAtual > totalPaginas) {
+    paginaAtual = totalPaginas;
+  }
 
-    tokens.forEach(t => {
-      const termoNumerico = /^\d+$/.test(t);
+  if (totalProdutos === 0) {
+    contador.innerText = "0 produtos encontrados";
+    catalogo.innerHTML = `<p>${gerarMensagemSemResultado()}</p>`;
+    return;
+  }
 
-      if (campos.descricao.includes(t)) {
-        pontos += termoNumerico ? 120 : 180;
-        encontrados++;
-      }
+  const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
+  const fim = inicio + ITENS_POR_PAGINA;
+  const produtosDaPagina = produtosFiltrados.slice(inicio, fim);
 
-      if (campos.descricao.startsWith(t)) pontos += 180;
-      if (campos.codigo.includes(t)) pontos += 160;
-      if (campos.ean.includes(t)) pontos += 150;
-      if (campos.embalagem.includes(t)) pontos += 80;
-      if (campos.qtdMaster === t) pontos += 65;
-      if (campos.codFornecedor.includes(t)) pontos += 60;
-      if (campos.fornecedor.includes(t)) pontos += 50;
+  contador.innerText = `${totalProdutos} produtos encontrados • Página ${paginaAtual} de ${totalPaginas}`;
 
-      if (!campos.tudo.includes(t) && termoNumerico) {
-        const numeroDescricao = campos.descricao.match(/\d+/g) || [];
-        if (numeroDescricao.some(n => n.includes(t))) pontos += 90;
-      }
+  produtosDaPagina.forEach(produto => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const caminhoImagem = produto.imagem ? `Imagens/${produto.imagem}` : "";
+
+    card.innerHTML = `
+      <div class="card-imagem">
+        ${produto.novidade ? `<span class="selo-novidade">NOVIDADE</span>` : ""}
+        ${
+          produto.imagem
+            ? `<img src="${caminhoImagem}" alt="${produto.descricao}" onerror="this.outerHTML='<div class=&quot;sem-imagem&quot;>Imagem não encontrada</div>'">`
+            : `<div class="sem-imagem">Sem imagem</div>`
+        }
+      </div>
+
+      <div class="codigo">Código: ${produto.codigo || "Não informado"}</div>
+      <div class="descricao">${produto.descricao || "Descrição não informada"}</div>
+      <div class="info">EAN: ${produto.ean || "Não informado"}</div>
+      <div class="info">Embalagem: ${produto.embalagem || "Não informada"}</div>
+      <div class="info">QTD Master: ${produto.qtdMaster || "Não informada"}</div>
+      <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
+      <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
+
+      <button class="btn-adicionar-cotacao" type="button" title="Adicionar à cotação">🛒</button>
+    `;
+
+    card.querySelector(".btn-adicionar-cotacao").addEventListener("click", () => {
+      adicionarNaCotacao(produto);
     });
 
-    if (tokens.length && tokens.every(t => campos.tudo.includes(t))) pontos += 350;
-    if (encontrados === tokens.length) pontos += 240;
-    if (p.estoque > 0) pontos += 20;
-    pontos += Math.min(p.estoque / 100, 25);
-
-    return { produto: p, pontos };
-  }).filter(x => x.pontos > 0);
-
-  resultados.sort((a, b) => {
-    if (b.pontos !== a.pontos) return b.pontos - a.pontos;
-    return b.produto.estoque - a.produto.estoque;
+    catalogo.appendChild(card);
   });
 
-  return resultados.map(x => x.produto);
+  if (totalPaginas > 1) {
+    const btnAnterior = document.createElement("button");
+    btnAnterior.innerText = "Anterior";
+    btnAnterior.disabled = paginaAtual === 1;
+    btnAnterior.addEventListener("click", () => {
+      paginaAtual--;
+      mostrarProdutos();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    const indicador = document.createElement("span");
+    indicador.innerText = `Página ${paginaAtual} de ${totalPaginas}`;
+
+    const btnProxima = document.createElement("button");
+    btnProxima.innerText = "Próxima";
+    btnProxima.disabled = paginaAtual === totalPaginas;
+    btnProxima.addEventListener("click", () => {
+      paginaAtual++;
+      mostrarProdutos();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    paginacao.appendChild(btnAnterior);
+    paginacao.appendChild(indicador);
+    paginacao.appendChild(btnProxima);
+  }
 }
 
-function ordenarProdutos(lista, busca) {
-  const tipo = $("ordenacao").value;
+function adicionarNaCotacao(produto) {
+  const codigo = String(produto.codigo).trim();
+  const itemExistente = cotacao.find(item => String(item.codigo).trim() === codigo);
 
-  if (tipo === "relevancia" && texto(busca)) return;
-
-  if (tipo === "codigoAsc") lista.sort((a, b) => numero(a.codigo) - numero(b.codigo));
-  if (tipo === "codigoDesc") lista.sort((a, b) => numero(b.codigo) - numero(a.codigo));
-  if (tipo === "descricaoAsc") lista.sort((a, b) => a.descricao.localeCompare(b.descricao));
-  if (tipo === "descricaoDesc") lista.sort((a, b) => b.descricao.localeCompare(a.descricao));
-  if (tipo === "estoqueDesc") lista.sort((a, b) => b.estoque - a.estoque);
-}
-
-function renderizarProdutos() {
-  const inicio = (paginaAtual - 1) * produtosPorPagina;
-  const fim = inicio + produtosPorPagina;
-  const pagina = produtosFiltrados.slice(inicio, fim);
-
-  $("listaProdutos").innerHTML = pagina.map(criarCardProduto).join("");
-  renderizarPaginacao();
-  renderizarMensagem();
-}
-
-function destacarTexto(valor) {
-  const busca = texto($("buscaPrincipal").value);
-  if (!busca) return valor;
-
-  let resultado = texto(valor);
-  const tokens = tokensBusca(busca).filter(t => t.length > 1).slice(0, 8);
-
-  tokens.forEach(t => {
-    const re = new RegExp(`(${escaparRegExp(t)})`, "ig");
-    resultado = resultado.replace(re, "<mark>$1</mark>");
-  });
-
-  return resultado;
-}
-
-function escaparRegExp(valor) {
-  return valor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function criarCardProduto(produto) {
-  const imagem = produto.imagem ? `Imagens/${produto.imagem}` : "";
-  const selo = ehNovidade(produto) ? `<span class="selo-novidade">Novidade</span>` : "";
-
-  return `
-    <article class="card" id="card-${produto.codigo}">
-      ${selo}
-      <div class="imagem-produto">
-        ${imagem ? `<img src="${imagem}" alt="${produto.descricao}" onerror="this.style.display='none'">` : ""}
-      </div>
-
-      <div class="codigo-destaque">Código: ${destacarTexto(produto.codigo)}</div>
-
-      <h3>${destacarTexto(produto.descricao)}</h3>
-
-      <div class="card-info">
-        <div class="info-linha">
-          <span class="info-label">EAN</span>
-          <span class="info-valor">${destacarTexto(produto.ean)}</span>
-        </div>
-
-        <div class="info-linha">
-          <span class="info-label">Embalagem</span>
-          <span class="info-valor">${destacarTexto(produto.embalagem)}</span>
-        </div>
-
-        <div class="info-linha">
-          <span class="info-label">QTD Master</span>
-          <span class="info-valor">${produto.qtdMaster}</span>
-        </div>
-
-        <div class="info-linha">
-          <span class="info-label">Cód. Fornecedor</span>
-          <span class="info-valor">${destacarTexto(produto.codFornecedor)}</span>
-        </div>
-
-        <div class="info-linha">
-          <span class="info-label">Fornecedor</span>
-          <span class="info-valor fornecedor-valor">${destacarTexto(produto.fornecedor)}</span>
-        </div>
-      </div>
-
-      <button onclick="adicionarCotacao('${produto.codigo}', this)">
-        Adicionar à Cotação
-      </button>
-    </article>
-  `;
-}
-
-function renderizarNovidades() {
-  if (menuAtual === "novidades") {
-    $("areaNovidades").innerHTML = "";
-    return;
+  if (itemExistente) {
+    itemExistente.quantidade += 1;
+  } else {
+    cotacao.push({
+      codigo: produto.codigo,
+      descricao: produto.descricao,
+      ean: produto.ean,
+      quantidade: 1
+    });
   }
 
-  const novidades = obterNovidades().slice(0, 12);
-
-  $("areaNovidades").innerHTML = `
-    <div class="faixa-novidades">
-      <h2>⭐ Novidades</h2>
-      <div class="produtos">
-        ${novidades.map(criarCardProduto).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderizarPaginacao() {
-  const totalPaginas = Math.max(1, Math.ceil(produtosFiltrados.length / produtosPorPagina));
-  const inicio = produtosFiltrados.length === 0 ? 0 : (paginaAtual - 1) * produtosPorPagina + 1;
-  const fim = Math.min(paginaAtual * produtosPorPagina, produtosFiltrados.length);
-
-  const html = `
-    <button onclick="mudarPagina(${paginaAtual - 1})" ${paginaAtual === 1 ? "disabled" : ""}>Anterior</button>
-    <span>Página ${paginaAtual} de ${totalPaginas}</span>
-    <button onclick="mudarPagina(${paginaAtual + 1})" ${paginaAtual === totalPaginas ? "disabled" : ""}>Próxima</button>
-    <span>Exibindo ${inicio} - ${fim} de ${produtosFiltrados.length}</span>
-    <input type="number" min="1" max="${totalPaginas}" value="${paginaAtual}" class="ir-pagina">
-    <button onclick="irParaPagina(this)">Ir</button>
-  `;
-
-  $("paginacaoTopo").innerHTML = html;
-  $("paginacaoBase").innerHTML = html;
-}
-
-function mudarPagina(pagina) {
-  const totalPaginas = Math.max(1, Math.ceil(produtosFiltrados.length / produtosPorPagina));
-  if (pagina < 1 || pagina > totalPaginas) return;
-
-  paginaAtual = pagina;
-  renderizarProdutos();
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function irParaPagina(botao) {
-  const input = botao.parentElement.querySelector(".ir-pagina");
-  mudarPagina(numero(input.value));
-}
-
-function renderizarMensagem() {
-  if (produtosFiltrados.length > 0) {
-    $("mensagemResultado").textContent = "";
-    return;
-  }
-
-  const busca = texto($("buscaPrincipal").value);
-  const fornecedor = texto($("buscaFornecedor").value);
-  const codFornecedor = texto($("buscaCodFornecedor").value);
-
-  let mensagem = "Nenhum produto encontrado";
-
-  if (busca) mensagem += ` para "${busca}"`;
-  if (fornecedor) mensagem += ` dentro do fornecedor ${fornecedor}`;
-  if (codFornecedor) mensagem += ` com código de fornecedor ${codFornecedor}`;
-
-  $("mensagemResultado").textContent = mensagem + ".";
-}
-
-function adicionarCotacao(codigo, botao) {
-  const produto = produtos.find(p => p.codigo === codigo);
-  if (!produto) return;
-
-  const item = cotacao.find(p => p.codigo === codigo);
-
-  if (item) item.quantidade += produto.qtdMaster;
-  else cotacao.push({ ...produto, quantidade: produto.qtdMaster });
-
-  botao.textContent = "Adicionado!";
-  botao.classList.add("confirmado");
-
-  const card = $(`card-${codigo}`);
-  if (card) card.classList.add("destaque-adicionado");
-
-  setTimeout(() => {
-    botao.textContent = "Adicionar à Cotação";
-    botao.classList.remove("confirmado");
-    if (card) card.classList.remove("destaque-adicionado");
-  }, 900);
-
-  mostrarToast("Produto adicionado à cotação.");
-  renderizarCotacao();
-}
-
-function renderizarCotacao() {
-  $("contadorTopo").textContent = cotacao.length;
-  $("contadorFlutuante").textContent = cotacao.length;
-
-  if (cotacao.length === 0) {
-    $("listaCotacao").innerHTML = "<p>Nenhum produto na cotação.</p>";
-    return;
-  }
-
-  $("listaCotacao").innerHTML = cotacao.map(criarItemCotacao).join("");
-}
-
-function criarItemCotacao(item) {
-  const restante = item.estoque - item.quantidade;
-  const mastersRestantes = Math.floor(restante / item.qtdMaster);
-
-  let aviso = "";
-
-  if (item.quantidade > item.estoque) {
-    aviso = `<div class="aviso-estoque erro">❌ Quantidade cotada superior ao estoque disponível.</div>`;
-  } else if (mastersRestantes <= 3) {
-    aviso = `<div class="aviso-estoque alerta">⚠️ Verifique a disponibilidade do estoque antes de concluir a cotação.</div>`;
-  }
-
-  return `
-    <div class="item-cotacao">
-      <strong>${item.descricao}</strong><br>
-      <small>
-        Código: ${item.codigo}<br>
-        EAN: ${item.ean}<br>
-        Embalagem: ${item.embalagem}<br>
-        QTD Master: ${item.qtdMaster}
-      </small>
-
-      <div class="controle-quantidade">
-        <button onclick="alterarQuantidade('${item.codigo}', -1)">−</button>
-        <input type="number" value="${item.quantidade}" onchange="alterarQuantidadeManual('${item.codigo}', this.value)">
-        <button onclick="alterarQuantidade('${item.codigo}', 1)">+</button>
-      </div>
-
-      <small>${item.quantidade / item.qtdMaster} master(s)</small>
-      ${aviso}
-      <button onclick="removerDaCotacao('${item.codigo}')">Remover</button>
-    </div>
-  `;
-}
-
-function alterarQuantidade(codigo, direcao) {
-  const item = cotacao.find(p => p.codigo === codigo);
-  if (!item) return;
-
-  item.quantidade += item.qtdMaster * direcao;
-  if (item.quantidade <= 0) return removerDaCotacao(codigo);
-
-  renderizarCotacao();
-}
-
-function alterarQuantidadeManual(codigo, valor) {
-  const item = cotacao.find(p => p.codigo === codigo);
-  if (!item) return;
-
-  let quantidade = numero(valor);
-  if (quantidade < item.qtdMaster) quantidade = item.qtdMaster;
-
-  item.quantidade = Math.ceil(quantidade / item.qtdMaster) * item.qtdMaster;
+  salvarCotacao();
   renderizarCotacao();
 }
 
 function removerDaCotacao(codigo) {
-  cotacao = cotacao.filter(p => p.codigo !== codigo);
+  cotacao = cotacao.filter(item => String(item.codigo).trim() !== String(codigo).trim());
+  salvarCotacao();
   renderizarCotacao();
+}
+
+function atualizarQuantidade(codigo, quantidade) {
+  const item = cotacao.find(item => String(item.codigo).trim() === String(codigo).trim());
+
+  if (!item) return;
+
+  item.quantidade = Math.max(1, Number(quantidade || 1));
+  salvarCotacao();
+  renderizarCotacao(false);
+}
+
+function salvarCotacao() {
+  localStorage.setItem("cotacaoEldorado", JSON.stringify(cotacao));
+}
+
+function carregarCotacaoSalva() {
+  try {
+    cotacao = JSON.parse(localStorage.getItem("cotacaoEldorado")) || [];
+  } catch {
+    cotacao = [];
+  }
+
+  renderizarCotacao();
+}
+
+function renderizarCotacao(recriarLista = true) {
+  document.getElementById("contadorCotacao").innerText = cotacao.length;
+
+  const lista = document.getElementById("listaCotacao");
+
+  if (!recriarLista) return;
+
+  lista.innerHTML = "";
+
+  if (!cotacao.length) {
+    lista.innerHTML = "<p>Nenhum produto adicionado à cotação.</p>";
+    return;
+  }
+
+  cotacao.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "item-cotacao";
+
+    div.innerHTML = `
+      <strong>Código: ${item.codigo}</strong>
+      <p>${item.descricao || "Descrição não informada"}</p>
+      <p>EAN: ${item.ean || "Não informado"}</p>
+
+      <div class="item-cotacao-acoes">
+        <label>
+          Qtd:
+          <input type="number" min="1" value="${item.quantidade}" />
+        </label>
+
+        <button type="button">Remover</button>
+      </div>
+    `;
+
+    div.querySelector("input").addEventListener("change", event => {
+      atualizarQuantidade(item.codigo, event.target.value);
+    });
+
+    div.querySelector("button").addEventListener("click", () => {
+      removerDaCotacao(item.codigo);
+    });
+
+    lista.appendChild(div);
+  });
+}
+
+function gerarTextoCotacao() {
+  const totalItens = cotacao.reduce((soma, item) => soma + Number(item.quantidade || 0), 0);
+
+  let texto = "SOLICITAÇÃO DE COTAÇÃO\n\n";
+
+  cotacao.forEach((item, index) => {
+    texto += `${index + 1}) Código: ${item.codigo}\n`;
+    texto += `Descrição: ${item.descricao || "Não informada"}\n`;
+    texto += `EAN: ${item.ean || "Não informado"}\n`;
+    texto += `Quantidade: ${item.quantidade}\n\n`;
+  });
+
+  texto += `Produtos distintos: ${cotacao.length}\n`;
+  texto += `Total de itens solicitados: ${totalItens}`;
+
+  return texto;
+}
+
+function copiarCotacao() {
+  if (!cotacao.length) {
+    alert("Nenhum produto foi adicionado à cotação.");
+    return;
+  }
+
+  navigator.clipboard.writeText(gerarTextoCotacao())
+    .then(() => alert("Cotação copiada com sucesso."))
+    .catch(() => alert("Não foi possível copiar a cotação."));
 }
 
 function limparCotacao() {
   if (!cotacao.length) return;
-  if (confirm("Deseja limpar toda a lista de cotação?")) {
-    cotacao = [];
-    renderizarCotacao();
-    mostrarToast("Lista de cotação limpa.");
-  }
+
+  const confirmar = confirm("Deseja limpar toda a lista de cotação?");
+
+  if (!confirmar) return;
+
+  cotacao = [];
+  salvarCotacao();
+  renderizarCotacao();
 }
 
-function textoCotacao() {
-  if (!cotacao.length) return "Nenhum produto na cotação.";
-
-  let textoFinal = "COTAÇÃO ELDORADO\n\n";
-
-  cotacao.forEach((item, index) => {
-    textoFinal += `${index + 1}. ${item.descricao}\n`;
-    textoFinal += `Código: ${item.codigo}\n`;
-    textoFinal += `EAN: ${item.ean}\n`;
-    textoFinal += `Embalagem: ${item.embalagem}\n`;
-    textoFinal += `QTD Master: ${item.qtdMaster}\n`;
-    textoFinal += `Quantidade: ${item.quantidade}\n`;
-    textoFinal += `Masters: ${item.quantidade / item.qtdMaster}\n`;
-    textoFinal += `Fornecedor: ${item.fornecedor}\n\n`;
-  });
-
-  return textoFinal;
+function limparNomeArquivo(texto) {
+  return normalizar(texto)
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "_")
+    .toUpperCase();
 }
 
-function copiarCotacao() {
-  navigator.clipboard.writeText(textoCotacao());
-  mostrarToast("Cotação copiada.");
-}
-
-function gerarPDF() {
+async function gerarPdfCotacao() {
   if (!cotacao.length) {
-    mostrarToast("Nenhum produto na cotação.");
+    alert("Nenhum produto foi adicionado à cotação.");
+    return;
+  }
+
+  const nomeInformado = document.getElementById("nomePdf").value.trim();
+
+  if (!nomeInformado) {
+    alert("Informe a Razão Social ou o Comprador Responsável para nomear o PDF.");
     return;
   }
 
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF();
-  let y = 15;
+  const doc = new jsPDF("p", "mm", "a4");
 
-  pdf.setFontSize(16);
-  pdf.text("Cotação Eldorado", 10, y);
-  y += 10;
+  const dataAtual = new Date().toLocaleDateString("pt-BR");
+  const totalItens = cotacao.reduce((soma, item) => soma + Number(item.quantidade || 0), 0);
 
-  pdf.setFontSize(10);
+  try {
+    doc.addImage("Logos/Eldorado.png", "PNG", 14, 10, 42, 22);
+  } catch {}
 
-  cotacao.forEach((item, index) => {
-    if (y > 270) {
-      pdf.addPage();
-      y = 15;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("SOLICITAÇÃO DE COTAÇÃO", 14, 42);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Cliente/Comprador: ${nomeInformado}`, 14, 51);
+  doc.text(`Data: ${dataAtual}`, 14, 58);
+  doc.text(`Produtos distintos: ${cotacao.length}`, 14, 65);
+  doc.text(`Total de itens solicitados: ${totalItens}`, 14, 72);
+
+  const linhas = cotacao.map(item => [
+    item.codigo || "",
+    item.descricao || "",
+    item.ean || "",
+    String(item.quantidade || 1)
+  ]);
+
+  doc.autoTable({
+    startY: 80,
+    head: [["Código", "Descrição", "EAN", "Quantidade"]],
+    body: linhas,
+    styles: {
+      fontSize: 8,
+      cellPadding: 2
+    },
+    headStyles: {
+      fillColor: [0, 150, 57],
+      textColor: [255, 255, 255]
+    },
+    columnStyles: {
+      0: { cellWidth: 25 },
+      1: { cellWidth: 90 },
+      2: { cellWidth: 45 },
+      3: { cellWidth: 25, halign: "center" }
     }
-
-    pdf.text(`${index + 1}. ${item.descricao}`, 10, y);
-    y += 6;
-    pdf.text(`Código: ${item.codigo} | EAN: ${item.ean}`, 10, y);
-    y += 6;
-    pdf.text(`Embalagem: ${item.embalagem} | QTD Master: ${item.qtdMaster}`, 10, y);
-    y += 6;
-    pdf.text(`Quantidade: ${item.quantidade} | Masters: ${item.quantidade / item.qtdMaster}`, 10, y);
-    y += 6;
-    pdf.text(`Fornecedor: ${item.fornecedor}`, 10, y);
-    y += 10;
   });
 
-  pdf.save("cotacao-eldorado.pdf");
+  const nomeArquivo = `COTACAO_${limparNomeArquivo(nomeInformado)}.pdf`;
+  doc.save(nomeArquivo);
 }
 
-function mostrarToast(mensagem) {
-  $("toast").textContent = mensagem;
-  $("toast").classList.add("ativo");
-
-  clearTimeout(window.toastTimer);
-  window.toastTimer = setTimeout(() => {
-    $("toast").classList.remove("ativo");
-  }, 2500);
+function abrirCotacao() {
+  document.getElementById("painelCotacao").classList.add("aberto");
+  document.getElementById("overlayCotacao").classList.add("aberto");
 }
 
-function mostrarSugestoesBusca() {
-  const busca = texto($("buscaPrincipal").value);
-
-  if (!busca || busca.length < 2) {
-    $("sugestoesBusca").innerHTML = "";
-    return;
-  }
-
-  const sugestoes = filtrarBuscaInteligente(produtosBase(), busca).slice(0, 6);
-
-  $("sugestoesBusca").innerHTML = sugestoes.map(p => `
-    <div onclick="selecionarBusca('${p.descricao.replace(/'/g, "\\'")}')">
-      <strong>${p.codigo}</strong> - ${p.descricao}
-    </div>
-  `).join("");
-}
-
-function selecionarBusca(valor) {
-  $("buscaPrincipal").value = valor;
-  $("sugestoesBusca").innerHTML = "";
-  salvarHistoricoBusca(valor);
-  aplicarFiltros();
-}
-
-function mostrarSugestoesFornecedor() {
-  const termo = normalizar($("buscaFornecedor").value);
-
-  if (!termo) {
-    $("sugestoesFornecedor").innerHTML = "";
-    return;
-  }
-
-  const mapa = {};
-
-  produtosBase().forEach(p => {
-    if (!p.fornecedor) return;
-
-    if (!mapa[p.fornecedor]) {
-      mapa[p.fornecedor] = { nome: p.fornecedor, estoque: 0, pontos: 0 };
-    }
-
-    mapa[p.fornecedor].estoque += p.estoque;
-    if (normalizar(p.fornecedor).includes(termo)) mapa[p.fornecedor].pontos += 10;
-  });
-
-  const sugestoes = Object.values(mapa)
-    .filter(f => normalizar(f.nome).includes(termo))
-    .sort((a, b) => (b.pontos + b.estoque / 1000) - (a.pontos + a.estoque / 1000))
-    .slice(0, 5);
-
-  $("sugestoesFornecedor").innerHTML = sugestoes.map(f => `
-    <div onclick="selecionarFornecedor('${f.nome.replace(/'/g, "\\'")}')">${f.nome}</div>
-  `).join("");
-}
-
-function selecionarFornecedor(nome) {
-  $("buscaFornecedor").value = nome;
-  $("sugestoesFornecedor").innerHTML = "";
-  aplicarFiltros();
-}
-
-function salvarHistoricoBusca(valor) {
-  const v = texto(valor);
-  if (!v) return;
-
-  ultimasBuscas = [v, ...ultimasBuscas.filter(x => x !== v)].slice(0, 5);
-  localStorage.setItem("ultimasBuscasCatalogo", JSON.stringify(ultimasBuscas));
-  renderizarHistoricoBusca();
-}
-
-function renderizarHistoricoBusca() {
-  if (!ultimasBuscas.length) {
-    $("historicoBusca").innerHTML = "";
-    return;
-  }
-
-  $("historicoBusca").innerHTML = ultimasBuscas.map(b => `
-    <button onclick="selecionarBusca('${b.replace(/'/g, "\\'")}')">🔎 ${b}</button>
-  `).join("");
-}
-
-function trocarMenu(menu) {
-  menuAtual = menu;
-  document.body.classList.toggle("ternura", menu === "ternura");
-
-  if (menu === "catalogo") {
-    $("logoCatalogo").src = "Logos/Eldorado.png";
-    $("tituloCatalogo").textContent = "Catálogo Eldorado";
-    $("subtituloCatalogo").textContent = "Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.";
-    $("seloModo").textContent = "Catálogo Comercial";
-  }
-
-  if (menu === "ternura") {
-    $("logoCatalogo").src = "Logos/Produtos-ternura.png";
-    $("tituloCatalogo").textContent = "Produtos Ternura";
-    $("subtituloCatalogo").textContent = "Catálogo exclusivo da linha Produtos Ternura.";
-    $("seloModo").textContent = "Linha Exclusiva";
-  }
-
-  if (menu === "novidades") {
-    $("logoCatalogo").src = "Logos/Eldorado.png";
-    $("tituloCatalogo").textContent = "Novidades Eldorado";
-    $("subtituloCatalogo").textContent = "Os 150 maiores códigos de produtos, exceto 999999 e 116451.";
-    $("seloModo").textContent = "Produtos em Destaque";
-  }
-
-  $("menuSuspenso").classList.remove("ativo");
-  aplicarFiltros();
+function fecharCotacao() {
+  document.getElementById("painelCotacao").classList.remove("aberto");
+  document.getElementById("overlayCotacao").classList.remove("aberto");
 }
 
 function limparFiltros() {
-  $("buscaPrincipal").value = "";
-  $("buscaCodFornecedor").value = "";
-  $("buscaFornecedor").value = "";
-  $("filtroEstoque").value = "com";
-  $("ordenacao").value = "relevancia";
-  $("sugestoesBusca").innerHTML = "";
-  $("sugestoesFornecedor").innerHTML = "";
+  document.getElementById("buscaPrincipal").value = "";
+  document.getElementById("buscaCodigoFornecedor").value = "";
+  document.getElementById("buscaFornecedor").value = "";
+  document.getElementById("ordenacao").value = "descricao-az";
+  document.getElementById("filtroEstoque").value = "com-estoque";
+  document.getElementById("sugestoesFornecedor").classList.remove("ativo");
+
+  paginaAtual = 1;
   aplicarFiltros();
 }
 
-function controlarBotaoTopo() {
-  $("btnTopo").style.display = window.scrollY > 300 ? "block" : "none";
+function trocarModo(novoModo) {
+  modoAtual = novoModo;
+
+  const config = CONFIG[modoAtual];
+
+  document.body.className = config.tema;
+  document.getElementById("logoCatalogo").src = config.logo;
+  document.getElementById("tituloCatalogo").innerText = config.titulo;
+  document.getElementById("subtituloCatalogo").innerText = config.subtitulo;
+
+  limparFiltros();
+  fecharMenu();
 }
 
-$("buscaPrincipal").addEventListener("input", () => {
+function abrirFecharMenu() {
+  document.getElementById("menuLateral").classList.toggle("aberto");
+}
+
+function fecharMenu() {
+  document.getElementById("menuLateral").classList.remove("aberto");
+}
+
+document.getElementById("buscaPrincipal").addEventListener("input", aplicarFiltros);
+document.getElementById("buscaCodigoFornecedor").addEventListener("input", aplicarFiltros);
+
+document.getElementById("buscaFornecedor").addEventListener("input", () => {
+  mostrarSugestoesFornecedor();
   aplicarFiltros();
-  mostrarSugestoesBusca();
 });
 
-$("buscaPrincipal").addEventListener("keydown", e => {
-  if (e.key === "Enter") {
-    salvarHistoricoBusca($("buscaPrincipal").value);
-    $("sugestoesBusca").innerHTML = "";
+document.getElementById("buscaFornecedor").addEventListener("focus", mostrarSugestoesFornecedor);
+document.getElementById("ordenacao").addEventListener("change", aplicarFiltros);
+
+document.getElementById("filtroEstoque").addEventListener("change", () => {
+  mostrarSugestoesFornecedor();
+  aplicarFiltros();
+});
+
+document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
+document.getElementById("btnCotacao").addEventListener("click", abrirCotacao);
+document.getElementById("fecharCotacao").addEventListener("click", fecharCotacao);
+document.getElementById("overlayCotacao").addEventListener("click", fecharCotacao);
+document.getElementById("copiarCotacao").addEventListener("click", copiarCotacao);
+document.getElementById("limparCotacao").addEventListener("click", limparCotacao);
+document.getElementById("gerarPdf").addEventListener("click", gerarPdfCotacao);
+
+document.getElementById("btnMenu").addEventListener("click", function(event) {
+  event.stopPropagation();
+  abrirFecharMenu();
+});
+
+document.getElementById("btnCatalogoEldorado").addEventListener("click", () => {
+  trocarModo("eldorado");
+});
+
+document.getElementById("btnProdutosTernura").addEventListener("click", () => {
+  trocarModo("ternura");
+});
+
+document.getElementById("btnNovidades").addEventListener("click", () => {
+  trocarModo("novidades");
+});
+
+document.addEventListener("click", function(event) {
+  const menu = document.getElementById("menuLateral");
+  const botao = document.getElementById("btnMenu");
+  const campoFornecedor = document.querySelector(".campo-fornecedor");
+
+  if (!menu.contains(event.target) && !botao.contains(event.target)) {
+    fecharMenu();
+  }
+
+  if (!campoFornecedor.contains(event.target)) {
+    document.getElementById("sugestoesFornecedor").classList.remove("ativo");
   }
 });
 
-$("buscaCodFornecedor").addEventListener("input", aplicarFiltros);
+const btnTopo = document.getElementById("btnTopo");
 
-$("buscaFornecedor").addEventListener("input", () => {
-  aplicarFiltros();
-  mostrarSugestoesFornecedor();
+window.addEventListener("scroll", () => {
+  if (window.scrollY > 300) {
+    btnTopo.classList.add("visivel");
+  } else {
+    btnTopo.classList.remove("visivel");
+  }
 });
 
-$("filtroEstoque").addEventListener("change", aplicarFiltros);
-$("ordenacao").addEventListener("change", aplicarFiltros);
-$("btnLimparFiltros").addEventListener("click", limparFiltros);
-
-$("btnMenu").addEventListener("click", () => {
-  $("menuSuspenso").classList.toggle("ativo");
+btnTopo.addEventListener("click", () => {
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 });
 
-document.querySelectorAll("#menuSuspenso button").forEach(botao => {
-  botao.addEventListener("click", () => trocarMenu(botao.dataset.menu));
-});
-
-$("btnCarrinhoTopo").addEventListener("click", () => $("painelCotacao").classList.add("ativo"));
-$("btnCarrinhoFlutuante").addEventListener("click", () => $("painelCotacao").classList.add("ativo"));
-$("btnFecharCotacao").addEventListener("click", () => $("painelCotacao").classList.remove("ativo"));
-
-$("btnCopiarCotacao").addEventListener("click", copiarCotacao);
-$("btnGerarPdf").addEventListener("click", gerarPDF);
-$("btnLimparCotacao").addEventListener("click", limparCotacao);
-
-$("btnTopo").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
-
-window.addEventListener("scroll", controlarBotaoTopo);
-
-document.addEventListener("click", e => {
-  if (!e.target.closest(".campo-busca")) $("sugestoesBusca").innerHTML = "";
-  if (!e.target.closest(".campo-fornecedor")) $("sugestoesFornecedor").innerHTML = "";
-});
-
-controlarBotaoTopo();
-renderizarCotacao();
-renderizarHistoricoBusca();
+carregarProdutos();
