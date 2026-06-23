@@ -29,20 +29,20 @@
         <span id="contadorCotacao">0</span>
       </button>
 
-      <button id="btnMenu" class="menu-btn" aria-label="Abrir menu">☰</button>
+      <button id="btnMenu" class="menu-btn" type="button" aria-label="Abrir menu">☰</button>
     </div>
 
     <nav id="menuLateral" class="menu-lateral">
-      <button id="btnCatalogoEldorado">Catálogo Eldorado</button>
-      <button id="btnProdutosTernura">Produtos Ternura</button>
-      <button id="btnNovidades">Novidades</button>
+      <button id="btnCatalogoEldorado" type="button">Catálogo Eldorado</button>
+      <button id="btnProdutosTernura" type="button">Produtos Ternura</button>
+      <button id="btnNovidades" type="button">Novidades</button>
     </nav>
   </header>
 
   <main class="container">
     <section class="filtros-area">
       <div class="busca-area">
-        <input type="text" id="buscaPrincipal" placeholder="Buscar por código do produto, EAN ou descrição..." autocomplete="off" />
+        <input type="text" id="buscaPrincipal" placeholder="Buscar por código do produto, descrição ou EAN..." autocomplete="off" />
         <input type="text" id="buscaCodigoFornecedor" placeholder="Código Fornecedor" autocomplete="off" />
 
         <div class="campo-fornecedor">
@@ -55,6 +55,7 @@
         <div class="ordenacao-area">
           <label for="ordenacao">Ordenar por:</label>
           <select id="ordenacao">
+            <option value="relevancia">Relevância da Busca</option>
             <option value="descricao-az">Descrição A-Z</option>
             <option value="descricao-za">Descrição Z-A</option>
             <option value="codigo-crescente">Código do Produto Crescente</option>
@@ -79,7 +80,9 @@
     </section>
 
     <div id="contador"></div>
+
     <section id="catalogo"></section>
+
     <div id="paginacao" class="paginacao"></div>
   </main>
 
@@ -92,6 +95,9 @@
     <div class="dados-pdf">
       <label for="nomePdf">Razão Social da loja ou Comprador responsável:</label>
       <input type="text" id="nomePdf" placeholder="Ex.: Supermercado São João" autocomplete="off" />
+
+      <label for="cnpjCliente">CNPJ do Cliente:</label>
+      <input type="text" id="cnpjCliente" placeholder="00.000.000/0000-00" maxlength="18" autocomplete="off" />
     </div>
 
     <div id="listaCotacao" class="lista-cotacao"></div>
@@ -104,13 +110,17 @@
   </aside>
 
   <div id="overlayCotacao" class="overlay-cotacao"></div>
+
   <div id="toast" class="toast"></div>
 
   <div class="botoes-flutuantes">
-    <button id="btnCarrinhoFlutuante" class="btn-flutuante btn-carrinho-flutuante" aria-label="Abrir carrinho">
+    <button id="btnCarrinhoFlutuante" class="btn-flutuante btn-carrinho-flutuante" type="button" aria-label="Abrir carrinho">
       🛒 <span id="contadorCotacaoFlutuante">0</span>
     </button>
-    <button id="btnTopo" class="btn-flutuante btn-topo" aria-label="Voltar ao topo">↑</button>
+
+    <button id="btnTopo" class="btn-flutuante btn-topo" type="button" aria-label="Voltar ao topo">
+      ↑
+    </button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

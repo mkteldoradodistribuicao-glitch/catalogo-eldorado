@@ -28,7 +28,7 @@ const CONFIG = {
   },
   novidades: {
     titulo: "Novidades",
-    subtitulo: "Os 150 maiores códigos de produtos, destacados com selo de novidade.",
+    subtitulo: "Conheça os lançamentos e as novidades que acabaram de chegar ao nosso mix.",
     logo: "Logos/Eldorado.png",
     tema: "tema-eldorado",
     filtroTernura: false,
@@ -66,13 +66,10 @@ async function carregarProdutos() {
         imagem: String(linha[6] || "").trim(),
         codigoFornecedor: String(linha[7] || "").trim(),
         fornecedor: String(linha[8] || "").trim(),
-        novidade: false
+        novidade: false,
+        relevancia: 999
       }))
-      .filter(produto =>
-        produto.codigo ||
-        produto.descricao ||
-        produto.ean
-      );
+      .filter(produto => produto.codigo || produto.descricao || produto.ean);
 
     marcarNovidades();
     carregarCotacaoSalva();
@@ -179,27 +176,91 @@ function compararCodigo(a, b) {
   return normalizar(a.codigo).localeCompare(normalizar(b.codigo), "pt-BR", { numeric: true });
 }
 
+function calcularRelevancia(produto, buscaPrincipal) {
+  const busca = normalizar(buscaPrincipal);
+  const termos = dividirTermos(buscaPrincipal);
+
+  if (!termos.length) return 999;
+
+  const codigo = normalizar(produto.codigo);
+  const descricao = normalizar(produto.descricao);
+  const ean = normalizar(produto.ean);
+  const codigoFornecedor = normalizar(produto.codigoFornecedor);
+  const fornecedor = normalizar(produto.fornecedor);
+
+  const descricaoDigitada = termos.join(" ");
+  const primeiraPalavra = termos[0];
+  const todosNaDescricao = termos.every(termo => descricao.includes(termo));
+  const todosNaOrdem = descricao.includes(descricaoDigitada);
+
+  if (codigo === busca) return 1;
+  if (codigo.startsWith(busca)) return 2;
+
+  if (descricao === busca) return 3;
+  if (descricao.startsWith(descricaoDigitada)) return 4;
+  if (descricao.startsWith(primeiraPalavra) && todosNaDescricao) return 5;
+  if (todosNaOrdem) return 6;
+  if (todosNaDescricao) return 7;
+
+  if (codigo.includes(busca)) return 8;
+
+  if (codigoFornecedor.includes(bushaSegura(busca))) return 9;
+  if (fornecedor.includes(busca)) return 10;
+
+  if (ean.startsWith(busca)) return 11;
+  if (ean.includes(busca)) return 12;
+
+  return 999;
+}
+
+function bushaSegura(valor) {
+  return valor || "";
+}
+
+function produtoCombinaBuscaPrincipal(produto, buscaPrincipal) {
+  const termos = dividirTermos(buscaPrincipal);
+
+  if (!termos.length) {
+    produto.relevancia = 999;
+    return true;
+  }
+
+  produto.relevancia = calcularRelevancia(produto, buscaPrincipal);
+  return produto.relevancia < 999;
+}
+
 function ordenarProdutos(lista) {
   const tipoOrdenacao = document.getElementById("ordenacao").value;
   const listaOrdenada = [...lista];
 
   switch (tipoOrdenacao) {
+    case "relevancia":
+      listaOrdenada.sort((a, b) => {
+        if (a.relevancia !== b.relevancia) return a.relevancia - b.relevancia;
+        return compararCodigo(a, b);
+      });
+      break;
+
     case "codigo-crescente":
       listaOrdenada.sort((a, b) => compararCodigo(a, b));
       break;
+
     case "codigo-decrescente":
       listaOrdenada.sort((a, b) => compararCodigo(b, a));
       break;
+
     case "descricao-az":
       listaOrdenada.sort((a, b) =>
         normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR")
       );
       break;
+
     case "descricao-za":
       listaOrdenada.sort((a, b) =>
         normalizar(b.descricao).localeCompare(normalizar(a.descricao), "pt-BR")
       );
       break;
+
     case "maior-estoque":
       listaOrdenada.sort((a, b) => b.estoque - a.estoque);
       break;
@@ -360,56 +421,6 @@ function fornecedorCombina(produtoFornecedor, buscaFornecedor) {
   });
 }
 
-function produtoCombinaPrincipal(produto, buscaPrincipal, permitirBuscaLivre) {
-  const busca = normalizar(buscaPrincipal);
-  const termos = dividirTermos(buscaPrincipal);
-
-  if (!termos.length) return true;
-
-  const codigo = normalizar(produto.codigo);
-  const ean = normalizar(produto.ean);
-  const descricao = normalizar(produto.descricao);
-  const primeiraPalavra = termos[0];
-
-  const codigoOuEanCombina = termos.every(termo =>
-    codigo.includes(termo) || ean.includes(termo)
-  );
-
-  if (codigoOuEanCombina) return true;
-
-  const descricaoContemTodos = termos.every(termo =>
-    descricao.includes(termo)
-  );
-
-  if (!descricaoContemTodos) return false;
-
-  if (permitirBuscaLivre || busca.startsWith("%")) {
-    return true;
-  }
-
-  return descricao.startsWith(primeiraPalavra);
-}
-
-function aplicarBuscaPrincipalComPrioridade(lista, buscaPrincipal) {
-  const termos = dividirTermos(buscaPrincipal);
-
-  if (!termos.length) return lista;
-
-  const buscaLivre = normalizar(buscaPrincipal).startsWith("%");
-
-  const resultadoPrioritario = lista.filter(produto =>
-    produtoCombinaPrincipal(produto, buscaPrincipal, buscaLivre)
-  );
-
-  if (resultadoPrioritario.length > 0) {
-    return resultadoPrioritario;
-  }
-
-  return lista.filter(produto =>
-    produtoCombinaPrincipal(produto, buscaPrincipal, true)
-  );
-}
-
 function gerarMensagemSemResultado() {
   const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
   const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value.trim();
@@ -451,7 +462,10 @@ function aplicarFiltros() {
     return encontrouCodigoFornecedor && encontrouFornecedor;
   });
 
-  resultado = aplicarBuscaPrincipalComPrioridade(resultado, buscaPrincipal);
+  resultado = resultado.filter(produto =>
+    produtoCombinaBuscaPrincipal(produto, buscaPrincipal)
+  );
+
   resultado = ordenarProdutos(resultado);
 
   produtosFiltrados = resultado;
@@ -549,6 +563,7 @@ function mostrarProdutos() {
 
     card.querySelector(".btn-adicionar-cotacao").addEventListener("click", () => {
       adicionarNaCotacao(produto);
+      aplicarEfeitoCardAdicionado(card);
     });
 
     catalogo.appendChild(card);
@@ -556,6 +571,16 @@ function mostrarProdutos() {
 
   renderizarPaginacao(paginacaoSuperior, totalPaginas);
   renderizarPaginacao(paginacao, totalPaginas);
+}
+
+function aplicarEfeitoCardAdicionado(card) {
+  card.classList.remove("produto-adicionado");
+  void card.offsetWidth;
+  card.classList.add("produto-adicionado");
+
+  setTimeout(() => {
+    card.classList.remove("produto-adicionado");
+  }, 900);
 }
 
 function adicionarNaCotacao(produto) {
@@ -624,6 +649,7 @@ function deveAvisarEstoque(item) {
 
 function renderizarCotacao() {
   const contador = cotacao.length;
+
   document.getElementById("contadorCotacao").innerText = contador;
   document.getElementById("contadorCotacaoFlutuante").innerText = contador;
 
@@ -671,9 +697,27 @@ function renderizarCotacao() {
   });
 }
 
+function formatarCNPJ(valor) {
+  return valor
+    .replace(/\D/g, "")
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2")
+    .slice(0, 18);
+}
+
 function gerarTextoCotacao() {
+  const nomeInformado = document.getElementById("nomePdf").value.trim();
+  const cnpjCliente = document.getElementById("cnpjCliente").value.trim();
+
   let texto = "SOLICITAÇÃO DE COTAÇÃO\n";
   texto += "Catálogo ilustrativo. Não caracteriza Pedido de Compra. Confirmar disponibilidade, preço e condições comerciais com o RCA.\n\n";
+
+  if (nomeInformado) texto += `Razão Social/Comprador: ${nomeInformado}\n`;
+  if (cnpjCliente) texto += `CNPJ: ${cnpjCliente}\n`;
+
+  texto += "\n";
 
   cotacao.forEach((item, index) => {
     texto += `${index + 1}) Código do Produto: ${item.codigo}\n`;
@@ -738,9 +782,15 @@ async function gerarPdfCotacao() {
   }
 
   const nomeInformado = document.getElementById("nomePdf").value.trim();
+  const cnpjCliente = document.getElementById("cnpjCliente").value.trim();
 
   if (!nomeInformado) {
     alert("Informe a Razão Social da loja ou o Comprador responsável para nomear o PDF.");
+    return;
+  }
+
+  if (!cnpjCliente) {
+    alert("Informe o CNPJ do Cliente.");
     return;
   }
 
@@ -761,9 +811,10 @@ async function gerarPdfCotacao() {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(`Razão Social/Comprador: ${nomeInformado}`, 14, 51);
-  doc.text(`Data: ${dataAtual}`, 14, 58);
-  doc.text(`Produtos distintos: ${cotacao.length}`, 14, 65);
-  doc.text(`Total de itens solicitados: ${totalItens}`, 14, 72);
+  doc.text(`CNPJ: ${cnpjCliente}`, 14, 58);
+  doc.text(`Data: ${dataAtual}`, 14, 65);
+  doc.text(`Produtos distintos: ${cotacao.length}`, 14, 72);
+  doc.text(`Total de itens solicitados: ${totalItens}`, 14, 79);
 
   const linhas = cotacao.map(item => [
     item.codigo || "",
@@ -773,7 +824,7 @@ async function gerarPdfCotacao() {
   ]);
 
   doc.autoTable({
-    startY: 82,
+    startY: 88,
     head: [["Código", "Descrição", "EAN", "Quantidade"]],
     body: linhas,
     styles: {
@@ -793,6 +844,7 @@ async function gerarPdfCotacao() {
   });
 
   const yFinal = doc.lastAutoTable.finalY + 10;
+
   doc.setFontSize(8);
   doc.text(
     "Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização.",
@@ -811,18 +863,20 @@ async function gerarPdfCotacao() {
 function abrirCotacao() {
   document.getElementById("painelCotacao").classList.add("aberto");
   document.getElementById("overlayCotacao").classList.add("aberto");
+  document.body.classList.add("cotacao-aberta");
 }
 
 function fecharCotacao() {
   document.getElementById("painelCotacao").classList.remove("aberto");
   document.getElementById("overlayCotacao").classList.remove("aberto");
+  document.body.classList.remove("cotacao-aberta");
 }
 
 function limparFiltros() {
   document.getElementById("buscaPrincipal").value = "";
   document.getElementById("buscaCodigoFornecedor").value = "";
   document.getElementById("buscaFornecedor").value = "";
-  document.getElementById("ordenacao").value = "descricao-az";
+  document.getElementById("ordenacao").value = "relevancia";
   document.getElementById("filtroEstoque").value = "com-estoque";
   document.getElementById("sugestoesFornecedor").classList.remove("ativo");
 
@@ -860,6 +914,7 @@ function mostrarToast(mensagem) {
   toast.classList.add("visivel");
 
   clearTimeout(toastTimer);
+
   toastTimer = setTimeout(() => {
     toast.classList.remove("visivel");
   }, 2600);
@@ -879,6 +934,10 @@ document.getElementById("ordenacao").addEventListener("change", aplicarFiltros);
 document.getElementById("filtroEstoque").addEventListener("change", () => {
   mostrarSugestoesFornecedor();
   aplicarFiltros();
+});
+
+document.getElementById("cnpjCliente").addEventListener("input", event => {
+  event.target.value = formatarCNPJ(event.target.value);
 });
 
 document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
