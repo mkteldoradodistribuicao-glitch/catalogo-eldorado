@@ -11,6 +11,10 @@
   --cor-suave: #e9f7ee;
 }
 
+body.cotacao-aberta {
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   font-family: Arial, sans-serif;
@@ -20,10 +24,6 @@ body {
     linear-gradient(180deg, var(--cor-fundo), #ffffff);
   color: var(--cor-texto);
   min-height: 100vh;
-}
-
-body.cotacao-aberta {
-  overflow: hidden;
 }
 
 body.tema-eldorado {
@@ -38,7 +38,6 @@ body.tema-ternura {
   --cor-secundaria: #0b74bd;
   --cor-fundo: #f3f8fc;
   --cor-suave: #e8f3fb;
-
   background:
     radial-gradient(circle at top left, rgba(0, 47, 95, 0.12), transparent 32%),
     radial-gradient(circle at bottom right, rgba(11, 116, 189, 0.10), transparent 30%),
@@ -351,43 +350,6 @@ body.tema-ternura {
   box-shadow: 0 10px 24px rgba(0,0,0,0.12);
 }
 
-.card.produto-adicionado {
-  animation: efeitoAdicionado 0.75s ease;
-  border-top-color: var(--cor-secundaria);
-}
-
-.card.produto-adicionado::after {
-  content: "✓ Adicionado";
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: var(--cor-principal);
-  color: white;
-  padding: 7px 11px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: bold;
-  box-shadow: 0 5px 14px rgba(0,0,0,0.18);
-  z-index: 5;
-}
-
-@keyframes efeitoAdicionado {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  }
-
-  35% {
-    transform: scale(1.025);
-    box-shadow: 0 0 0 4px rgba(0, 150, 57, 0.16), 0 12px 28px rgba(0,0,0,0.16);
-  }
-
-  100% {
-    transform: scale(1);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  }
-}
-
 .card-imagem {
   position: relative;
   background: #ffffff;
@@ -485,6 +447,44 @@ body.tema-ternura {
   box-shadow: 0 8px 20px rgba(0,0,0,0.18);
 }
 
+
+.card.produto-adicionado {
+  animation: efeitoAdicionado 0.75s ease;
+  border-top-color: var(--cor-secundaria);
+}
+
+.card.produto-adicionado::after {
+  content: "✓ Adicionado";
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: var(--cor-principal);
+  color: white;
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 5px 14px rgba(0,0,0,0.18);
+  z-index: 5;
+}
+
+@keyframes efeitoAdicionado {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
+
+  35% {
+    transform: scale(1.025);
+    box-shadow: 0 0 0 4px rgba(0, 150, 57, 0.16), 0 12px 28px rgba(0,0,0,0.16);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
+}
+
 .paginacao {
   margin: 28px 0 10px;
   display: flex;
@@ -533,7 +533,6 @@ body.tema-ternura {
   transition: right 0.25s ease;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .painel-cotacao.aberto {
@@ -588,8 +587,6 @@ body.tema-ternura {
 
 .lista-cotacao {
   overflow-y: auto;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
   flex: 1;
   padding-right: 4px;
 }
