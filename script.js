@@ -53,7 +53,7 @@ async function carregarProdutos() {
       defval: ""
     });
 
-    const linhas = dados.slice(1);
+    const linhas = dados.slice(2);
 
     produtos = linhas
       .map(linha => ({
