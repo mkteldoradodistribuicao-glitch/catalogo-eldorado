@@ -41,7 +41,7 @@ async function carregarProdutos() {
     const resposta = await fetch("Produtos.xlsx");
 
     if (!resposta.ok) {
-      throw new Error("Planilha não encontrada.");
+      throw new Error("Planilha Produtos.xlsx não encontrada na raiz do projeto.");
     }
 
     const arquivo = await resposta.arrayBuffer();
@@ -53,22 +53,10 @@ async function carregarProdutos() {
       defval: ""
     });
 
-    const linhas = dados.slice(2);
+    const linhas = detectarLinhasDeProdutos(dados);
 
     produtos = linhas
-      .map(linha => ({
-        codigo: String(linha[1] || "").trim(),
-        ean: String(linha[2] || "").trim(),
-        descricao: String(linha[3] || "").trim(),
-        embalagem: String(linha[4] || "").trim(),
-        qtdMaster: String(linha[5] || "").trim(),
-        estoque: Number(linha[6] || 0),
-        imagem: String(linha[7] || "").trim(),
-        codigoFornecedor: String(linha[8] || "").trim(),
-        fornecedor: String(linha[9] || "").trim(),
-        novidade: false,
-        relevancia: 999
-      }))
+      .map(linha => criarProdutoAPartirDaLinha(linha))
       .filter(produto => produto.codigo || produto.descricao || produto.ean);
 
     marcarNovidades();
@@ -81,6 +69,49 @@ async function carregarProdutos() {
       "<p>Não foi possível carregar a planilha de produtos.</p>";
     console.error(erro);
   }
+}
+
+function detectarLinhasDeProdutos(dados) {
+  const indiceCabecalho = dados.findIndex(linha =>
+    linha.some(celula => normalizar(celula).includes("codigo")) &&
+    linha.some(celula => normalizar(celula).includes("descricao"))
+  );
+
+  if (indiceCabecalho >= 0) {
+    return dados.slice(indiceCabecalho + 1);
+  }
+
+  return dados.slice(1);
+}
+
+function criarProdutoAPartirDaLinha(linha) {
+  const primeiraColunaVazia = !String(linha[0] || "").trim();
+  const inicio = primeiraColunaVazia ? 1 : 0;
+
+  return {
+    codigo: String(linha[inicio + 0] || "").trim(),
+    ean: String(linha[inicio + 1] || "").trim(),
+    descricao: String(linha[inicio + 2] || "").trim(),
+    embalagem: String(linha[inicio + 3] || "").trim(),
+    qtdMaster: String(linha[inicio + 4] || "").trim(),
+    estoque: numeroSeguro(linha[inicio + 5]),
+    imagem: String(linha[inicio + 6] || "").trim(),
+    codigoFornecedor: String(linha[inicio + 7] || "").trim(),
+    fornecedor: String(linha[inicio + 8] || "").trim(),
+    novidade: false,
+    relevancia: 999
+  };
+}
+
+function numeroSeguro(valor) {
+  if (typeof valor === "number") return valor;
+
+  const texto = String(valor || "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+    .replace(/[^\d.-]/g, "");
+
+  return Number(texto || 0);
 }
 
 function normalizar(texto) {
@@ -105,13 +136,13 @@ function codigoNumerico(produto) {
 }
 
 function qtdMasterNumerica(valor) {
-  const numero = Number(String(valor || "").replace(",", ".").replace(/[^\d.]/g, ""));
+  const numero = numeroSeguro(valor);
   return numero > 0 ? numero : 1;
 }
 
 function ajustarParaMultiplo(quantidade, qtdMaster) {
   const master = qtdMasterNumerica(qtdMaster);
-  const qtd = Math.max(master, Number(quantidade || master));
+  const qtd = Math.max(master, numeroSeguro(quantidade || master));
   return Math.ceil(qtd / master) * master;
 }
 
@@ -155,18 +186,25 @@ function aplicarFiltroEstoque(lista) {
   const tipo = document.getElementById("filtroEstoque").value;
 
   if (tipo === "com-estoque") {
-    return lista.filter(produto => Number(produto.estoque || 0) > 0);
+    return lista.filter(produto => numeroSeguro(produto.estoque) > 0);
   }
 
   if (tipo === "sem-estoque") {
-    return lista.filter(produto => Number(produto.estoque || 0) <= 0);
+    return lista.filter(produto => numeroSeguro(produto.estoque) <= 0);
   }
 
   return lista;
 }
 
 function compararCodigo(a, b) {
-  return codigoNumerico(a) - codigoNumerico(b);
+  const numeroA = codigoNumerico(a);
+  const numeroB = codigoNumerico(b);
+
+  if (numeroA !== numeroB) {
+    return numeroA - numeroB;
+  }
+
+  return normalizar(a.codigo).localeCompare(normalizar(b.codigo), "pt-BR", { numeric: true });
 }
 
 function calcularRelevancia(produto, buscaPrincipal) {
@@ -234,54 +272,34 @@ function ordenarProdutos(lista) {
   if (existeBuscaPrincipal) {
     listaOrdenada.sort((a, b) => {
       if (a.relevancia !== b.relevancia) return a.relevancia - b.relevancia;
-
-      switch (tipoOrdenacao) {
-        case "codigo-crescente":
-          return compararCodigo(a, b);
-        case "codigo-decrescente":
-          return compararCodigo(b, a);
-        case "descricao-az":
-          return normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR");
-        case "descricao-za":
-          return normalizar(b.descricao).localeCompare(normalizar(a.descricao), "pt-BR");
-        case "maior-estoque":
-          return b.estoque - a.estoque;
-        default:
-          return compararCodigo(a, b);
-      }
+      return aplicarOrdenacaoEscolhida(a, b, tipoOrdenacao);
     });
 
     return listaOrdenada;
   }
 
+  listaOrdenada.sort((a, b) => aplicarOrdenacaoEscolhida(a, b, tipoOrdenacao));
+  return listaOrdenada;
+}
+
+function aplicarOrdenacaoEscolhida(a, b, tipoOrdenacao) {
   switch (tipoOrdenacao) {
     case "codigo-crescente":
-      listaOrdenada.sort((a, b) => compararCodigo(a, b));
-      break;
+      return compararCodigo(a, b);
 
     case "codigo-decrescente":
-      listaOrdenada.sort((a, b) => compararCodigo(b, a));
-      break;
+      return compararCodigo(b, a);
 
     case "descricao-az":
-      listaOrdenada.sort((a, b) =>
-        normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR")
-      );
-      break;
+      return normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR");
 
     case "descricao-za":
-      listaOrdenada.sort((a, b) =>
-        normalizar(b.descricao).localeCompare(normalizar(a.descricao), "pt-BR")
-      );
-      break;
+      return normalizar(b.descricao).localeCompare(normalizar(a.descricao), "pt-BR");
 
     case "maior-estoque":
     default:
-      listaOrdenada.sort((a, b) => b.estoque - a.estoque);
-      break;
+      return numeroSeguro(b.estoque) - numeroSeguro(a.estoque);
   }
-
-  return listaOrdenada;
 }
 
 function calcularDistancia(a, b) {
@@ -337,7 +355,7 @@ function pontuarFornecedor(nomeFornecedor, termoBusca, estoqueTotal) {
     });
   });
 
-  pontos += Math.min(estoqueTotal, 10000) * 0.01;
+  pontos += Math.min(numeroSeguro(estoqueTotal), 10000) * 0.01;
 
   return pontos;
 }
@@ -367,7 +385,7 @@ function obterSugestoesFornecedor() {
     }
 
     const fornecedor = mapaFornecedores.get(chave);
-    fornecedor.estoqueTotal += Number(produto.estoque || 0);
+    fornecedor.estoqueTotal += numeroSeguro(produto.estoque);
     fornecedor.quantidadeProdutos += 1;
   });
 
@@ -604,7 +622,7 @@ function adicionarNaCotacao(produto) {
   const master = qtdMasterNumerica(produto.qtdMaster);
 
   if (itemExistente) {
-    itemExistente.quantidade = ajustarParaMultiplo(Number(itemExistente.quantidade || master) + master, master);
+    itemExistente.quantidade = ajustarParaMultiplo(numeroSeguro(itemExistente.quantidade) + master, master);
   } else {
     cotacao.push({
       codigo: produto.codigo,
@@ -612,7 +630,7 @@ function adicionarNaCotacao(produto) {
       ean: produto.ean,
       quantidade: master,
       qtdMaster: master,
-      estoque: Number(produto.estoque || 0)
+      estoque: numeroSeguro(produto.estoque)
     });
   }
 
@@ -652,9 +670,9 @@ function carregarCotacaoSalva() {
 }
 
 function deveAvisarEstoque(item) {
-  const estoque = Number(item.estoque || 0);
+  const estoque = numeroSeguro(item.estoque);
   const master = qtdMasterNumerica(item.qtdMaster);
-  const quantidade = Number(item.quantidade || 0);
+  const quantidade = numeroSeguro(item.quantidade);
 
   if (estoque <= 0 || master <= 0 || quantidade <= 0) return false;
 
@@ -813,7 +831,7 @@ async function gerarPdfCotacao() {
   const doc = new jsPDF("p", "mm", "a4");
 
   const dataAtual = new Date().toLocaleDateString("pt-BR");
-  const totalItens = cotacao.reduce((soma, item) => soma + Number(item.quantidade || 0), 0);
+  const totalItens = cotacao.reduce((soma, item) => soma + numeroSeguro(item.quantidade), 0);
 
   try {
     doc.addImage("Logos/Eldorado.png", "PNG", 14, 10, 42, 22);
@@ -908,7 +926,6 @@ function trocarModo(novoModo) {
   document.getElementById("logoCatalogo").src = config.logo;
   document.getElementById("tituloCatalogo").innerText = config.titulo;
   document.getElementById("subtituloCatalogo").innerText = config.subtitulo;
-  document.getElementById("ordenacao").value = modoAtual === "novidades" ? "codigo-decrescente" : "maior-estoque";
 
   limparFiltros();
   fecharMenu();
@@ -945,6 +962,7 @@ document.getElementById("buscaFornecedor").addEventListener("input", () => {
 });
 
 document.getElementById("buscaFornecedor").addEventListener("focus", mostrarSugestoesFornecedor);
+
 document.getElementById("ordenacao").addEventListener("change", aplicarFiltros);
 
 document.getElementById("filtroEstoque").addEventListener("change", () => {
@@ -1018,5 +1036,3 @@ btnTopo.addEventListener("click", () => {
 
 document.getElementById("ordenacao").value = "maior-estoque";
 carregarProdutos();
-'''
-The file is too long and its contents have been truncated.
