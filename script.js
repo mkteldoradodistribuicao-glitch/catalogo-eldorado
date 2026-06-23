@@ -185,11 +185,9 @@ function calcularRelevancia(produto, buscaPrincipal) {
   const codigo = normalizar(produto.codigo);
   const descricao = normalizar(produto.descricao);
   const ean = normalizar(produto.ean);
-  const codigoFornecedor = normalizar(produto.codigoFornecedor);
-  const fornecedor = normalizar(produto.fornecedor);
-
   const descricaoDigitada = termos.join(" ");
   const primeiraPalavra = termos[0];
+
   const todosNaDescricao = termos.every(termo => descricao.includes(termo));
   const todosNaOrdem = descricao.includes(descricaoDigitada);
 
@@ -204,17 +202,10 @@ function calcularRelevancia(produto, buscaPrincipal) {
 
   if (codigo.includes(busca)) return 8;
 
-  if (codigoFornecedor.includes(bushaSegura(busca))) return 9;
-  if (fornecedor.includes(busca)) return 10;
-
-  if (ean.startsWith(busca)) return 11;
-  if (ean.includes(busca)) return 12;
+  if (ean.startsWith(busca)) return 9;
+  if (ean.includes(busca)) return 10;
 
   return 999;
-}
-
-function bushaSegura(valor) {
-  return valor || "";
 }
 
 function produtoCombinaBuscaPrincipal(produto, buscaPrincipal) {
@@ -231,16 +222,34 @@ function produtoCombinaBuscaPrincipal(produto, buscaPrincipal) {
 
 function ordenarProdutos(lista) {
   const tipoOrdenacao = document.getElementById("ordenacao").value;
+  const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
+  const existeBuscaPrincipal = dividirTermos(buscaPrincipal).length > 0;
   const listaOrdenada = [...lista];
 
-  switch (tipoOrdenacao) {
-    case "relevancia":
-      listaOrdenada.sort((a, b) => {
-        if (a.relevancia !== b.relevancia) return a.relevancia - b.relevancia;
-        return compararCodigo(a, b);
-      });
-      break;
+  if (existeBuscaPrincipal) {
+    listaOrdenada.sort((a, b) => {
+      if (a.relevancia !== b.relevancia) return a.relevancia - b.relevancia;
 
+      switch (tipoOrdenacao) {
+        case "codigo-crescente":
+          return compararCodigo(a, b);
+        case "codigo-decrescente":
+          return compararCodigo(b, a);
+        case "descricao-az":
+          return normalizar(a.descricao).localeCompare(normalizar(b.descricao), "pt-BR");
+        case "descricao-za":
+          return normalizar(b.descricao).localeCompare(normalizar(a.descricao), "pt-BR");
+        case "maior-estoque":
+          return b.estoque - a.estoque;
+        default:
+          return compararCodigo(a, b);
+      }
+    });
+
+    return listaOrdenada;
+  }
+
+  switch (tipoOrdenacao) {
     case "codigo-crescente":
       listaOrdenada.sort((a, b) => compararCodigo(a, b));
       break;
@@ -262,6 +271,7 @@ function ordenarProdutos(lista) {
       break;
 
     case "maior-estoque":
+    default:
       listaOrdenada.sort((a, b) => b.estoque - a.estoque);
       break;
   }
@@ -876,7 +886,7 @@ function limparFiltros() {
   document.getElementById("buscaPrincipal").value = "";
   document.getElementById("buscaCodigoFornecedor").value = "";
   document.getElementById("buscaFornecedor").value = "";
-  document.getElementById("ordenacao").value = "relevancia";
+  document.getElementById("ordenacao").value = "maior-estoque";
   document.getElementById("filtroEstoque").value = "com-estoque";
   document.getElementById("sugestoesFornecedor").classList.remove("ativo");
 
