@@ -21,7 +21,7 @@ const CONFIG = {
   ternura: {
     titulo: "Produtos Ternura",
     subtitulo: "Catálogo exclusivo da linha Produtos Ternura.",
-    logo: "Logos/Produtos-Ternura.png",
+    logo: "Logos/Produtos-ternura.png",
     tema: "tema-ternura",
     filtroTernura: true,
     filtroNovidade: false
