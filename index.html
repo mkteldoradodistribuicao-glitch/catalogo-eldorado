@@ -18,10 +18,15 @@
       <div class="titulo-area">
         <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
         <p id="subtituloCatalogo">Consulte produtos por código, descrição, EAN, fornecedor ou código do fornecedor.</p>
+
+        <div class="aviso-catalogo">
+          Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização.
+        </div>
       </div>
 
       <button id="btnCotacao" class="cotacao-btn" type="button" aria-label="Abrir cotação">
-        🛒 <span id="contadorCotacao">0</span>
+        <span class="icone-carrinho">🛒</span>
+        <span id="contadorCotacao">0</span>
       </button>
 
       <button id="btnMenu" class="menu-btn" aria-label="Abrir menu">☰</button>
@@ -69,6 +74,8 @@
 
         <button id="btnLimparFiltros" class="btn-limpar" type="button">Limpar Filtros</button>
       </div>
+
+      <div id="paginacaoSuperior" class="paginacao paginacao-superior"></div>
     </section>
 
     <div id="contador"></div>
@@ -83,22 +90,28 @@
     </div>
 
     <div class="dados-pdf">
-      <label for="nomePdf">Razão Social ou Comprador Responsável:</label>
+      <label for="nomePdf">Razão Social da loja ou Comprador responsável:</label>
       <input type="text" id="nomePdf" placeholder="Ex.: Supermercado São João" autocomplete="off" />
     </div>
 
     <div id="listaCotacao" class="lista-cotacao"></div>
 
     <div class="acoes-cotacao">
-      <button id="copiarCotacao" type="button">Copiar Cotação</button>
+      <button id="limparCotacao" type="button" class="botao-perigo">Limpar carrinho</button>
       <button id="gerarPdf" type="button">Gerar Cotação em PDF</button>
-      <button id="limparCotacao" type="button" class="botao-perigo">Limpar Cotação</button>
+      <button id="copiarCotacao" type="button">Copiar cotação</button>
     </div>
   </aside>
 
   <div id="overlayCotacao" class="overlay-cotacao"></div>
+  <div id="toast" class="toast"></div>
 
-  <button id="btnTopo" class="btn-topo" aria-label="Voltar ao topo">↑</button>
+  <div class="botoes-flutuantes">
+    <button id="btnCarrinhoFlutuante" class="btn-flutuante btn-carrinho-flutuante" aria-label="Abrir carrinho">
+      🛒 <span id="contadorCotacaoFlutuante">0</span>
+    </button>
+    <button id="btnTopo" class="btn-flutuante btn-topo" aria-label="Voltar ao topo">↑</button>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>

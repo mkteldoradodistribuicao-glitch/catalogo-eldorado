@@ -7,6 +7,7 @@ let paginaAtual = 1;
 const ITENS_POR_PAGINA = 150;
 const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
 const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
+const AVISO_ESTOQUE = "⚠️ Verifique a disponibilidade de estoque antes de finalizar esta cotação.";
 
 const CONFIG = {
   eldorado: {
@@ -104,6 +105,17 @@ function dividirTermos(texto) {
 function codigoNumerico(produto) {
   const codigo = String(produto.codigo || "").replace(/\D/g, "");
   return Number(codigo || 0);
+}
+
+function qtdMasterNumerica(valor) {
+  const numero = Number(String(valor || "").replace(",", ".").replace(/[^\d.]/g, ""));
+  return numero > 0 ? numero : 1;
+}
+
+function ajustarParaMultiplo(quantidade, qtdMaster) {
+  const master = qtdMasterNumerica(qtdMaster);
+  const qtd = Math.max(master, Number(quantidade || master));
+  return Math.ceil(qtd / master) * master;
 }
 
 function marcarNovidades() {
@@ -448,13 +460,46 @@ function aplicarFiltros() {
   mostrarProdutos();
 }
 
+function renderizarPaginacao(container, totalPaginas) {
+  container.innerHTML = "";
+
+  if (totalPaginas <= 1) return;
+
+  const btnAnterior = document.createElement("button");
+  btnAnterior.innerText = "Anterior";
+  btnAnterior.disabled = paginaAtual === 1;
+  btnAnterior.addEventListener("click", () => {
+    paginaAtual--;
+    mostrarProdutos();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  const indicador = document.createElement("span");
+  indicador.innerText = `Página ${paginaAtual} de ${totalPaginas}`;
+
+  const btnProxima = document.createElement("button");
+  btnProxima.innerText = "Próxima";
+  btnProxima.disabled = paginaAtual === totalPaginas;
+  btnProxima.addEventListener("click", () => {
+    paginaAtual++;
+    mostrarProdutos();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  container.appendChild(btnAnterior);
+  container.appendChild(indicador);
+  container.appendChild(btnProxima);
+}
+
 function mostrarProdutos() {
   const catalogo = document.getElementById("catalogo");
   const contador = document.getElementById("contador");
   const paginacao = document.getElementById("paginacao");
+  const paginacaoSuperior = document.getElementById("paginacaoSuperior");
 
   catalogo.innerHTML = "";
   paginacao.innerHTML = "";
+  paginacaoSuperior.innerHTML = "";
 
   const totalProdutos = produtosFiltrados.length;
   const totalPaginas = Math.max(1, Math.ceil(totalProdutos / ITENS_POR_PAGINA));
@@ -499,7 +544,7 @@ function mostrarProdutos() {
       <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
       <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
 
-      <button class="btn-adicionar-cotacao" type="button" title="Adicionar à cotação">🛒</button>
+      <button class="btn-adicionar-cotacao" type="button" title="Adicionar à cotação">🛒 Adicionar à cotação</button>
     `;
 
     card.querySelector(".btn-adicionar-cotacao").addEventListener("click", () => {
@@ -509,51 +554,31 @@ function mostrarProdutos() {
     catalogo.appendChild(card);
   });
 
-  if (totalPaginas > 1) {
-    const btnAnterior = document.createElement("button");
-    btnAnterior.innerText = "Anterior";
-    btnAnterior.disabled = paginaAtual === 1;
-    btnAnterior.addEventListener("click", () => {
-      paginaAtual--;
-      mostrarProdutos();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-
-    const indicador = document.createElement("span");
-    indicador.innerText = `Página ${paginaAtual} de ${totalPaginas}`;
-
-    const btnProxima = document.createElement("button");
-    btnProxima.innerText = "Próxima";
-    btnProxima.disabled = paginaAtual === totalPaginas;
-    btnProxima.addEventListener("click", () => {
-      paginaAtual++;
-      mostrarProdutos();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-
-    paginacao.appendChild(btnAnterior);
-    paginacao.appendChild(indicador);
-    paginacao.appendChild(btnProxima);
-  }
+  renderizarPaginacao(paginacaoSuperior, totalPaginas);
+  renderizarPaginacao(paginacao, totalPaginas);
 }
 
 function adicionarNaCotacao(produto) {
   const codigo = String(produto.codigo).trim();
   const itemExistente = cotacao.find(item => String(item.codigo).trim() === codigo);
+  const master = qtdMasterNumerica(produto.qtdMaster);
 
   if (itemExistente) {
-    itemExistente.quantidade += 1;
+    itemExistente.quantidade = ajustarParaMultiplo(Number(itemExistente.quantidade || master) + master, master);
   } else {
     cotacao.push({
       codigo: produto.codigo,
       descricao: produto.descricao,
       ean: produto.ean,
-      quantidade: 1
+      quantidade: master,
+      qtdMaster: master,
+      estoque: Number(produto.estoque || 0)
     });
   }
 
   salvarCotacao();
   renderizarCotacao();
+  mostrarToast("Produto adicionado à cotação.");
 }
 
 function removerDaCotacao(codigo) {
@@ -567,9 +592,9 @@ function atualizarQuantidade(codigo, quantidade) {
 
   if (!item) return;
 
-  item.quantidade = Math.max(1, Number(quantidade || 1));
+  item.quantidade = ajustarParaMultiplo(quantidade, item.qtdMaster);
   salvarCotacao();
-  renderizarCotacao(false);
+  renderizarCotacao();
 }
 
 function salvarCotacao() {
@@ -586,13 +611,23 @@ function carregarCotacaoSalva() {
   renderizarCotacao();
 }
 
-function renderizarCotacao(recriarLista = true) {
-  document.getElementById("contadorCotacao").innerText = cotacao.length;
+function deveAvisarEstoque(item) {
+  const estoque = Number(item.estoque || 0);
+  const master = qtdMasterNumerica(item.qtdMaster);
+  const quantidade = Number(item.quantidade || 0);
+
+  if (estoque <= 0 || master <= 0 || quantidade <= 0) return false;
+
+  const limiteAviso = estoque - (master * 3);
+  return quantidade >= limiteAviso;
+}
+
+function renderizarCotacao() {
+  const contador = cotacao.length;
+  document.getElementById("contadorCotacao").innerText = contador;
+  document.getElementById("contadorCotacaoFlutuante").innerText = contador;
 
   const lista = document.getElementById("listaCotacao");
-
-  if (!recriarLista) return;
-
   lista.innerHTML = "";
 
   if (!cotacao.length) {
@@ -601,22 +636,27 @@ function renderizarCotacao(recriarLista = true) {
   }
 
   cotacao.forEach(item => {
+    const master = qtdMasterNumerica(item.qtdMaster);
+
     const div = document.createElement("div");
     div.className = "item-cotacao";
 
     div.innerHTML = `
-      <strong>Código: ${item.codigo}</strong>
-      <p>${item.descricao || "Descrição não informada"}</p>
-      <p>EAN: ${item.ean || "Não informado"}</p>
+      <strong>Código do Produto: ${item.codigo}</strong>
+      <p><b>Descrição:</b> ${item.descricao || "Não informada"}</p>
+      <p><b>EAN:</b> ${item.ean || "Não informado"}</p>
 
       <div class="item-cotacao-acoes">
         <label>
-          Qtd:
-          <input type="number" min="1" value="${item.quantidade}" />
+          Quantidade desejada
+          <input type="number" min="${master}" step="${master}" value="${item.quantidade}" />
         </label>
 
         <button type="button">Remover</button>
       </div>
+
+      <p><b>Múltiplo QTD Master:</b> ${master}</p>
+      ${deveAvisarEstoque(item) ? `<div class="aviso-estoque">${AVISO_ESTOQUE}</div>` : ""}
     `;
 
     div.querySelector("input").addEventListener("change", event => {
@@ -632,21 +672,30 @@ function renderizarCotacao(recriarLista = true) {
 }
 
 function gerarTextoCotacao() {
-  const totalItens = cotacao.reduce((soma, item) => soma + Number(item.quantidade || 0), 0);
-
-  let texto = "SOLICITAÇÃO DE COTAÇÃO\n\n";
+  let texto = "SOLICITAÇÃO DE COTAÇÃO\n";
+  texto += "Catálogo ilustrativo. Não caracteriza Pedido de Compra. Confirmar disponibilidade, preço e condições comerciais com o RCA.\n\n";
 
   cotacao.forEach((item, index) => {
-    texto += `${index + 1}) Código: ${item.codigo}\n`;
+    texto += `${index + 1}) Código do Produto: ${item.codigo}\n`;
     texto += `Descrição: ${item.descricao || "Não informada"}\n`;
     texto += `EAN: ${item.ean || "Não informado"}\n`;
-    texto += `Quantidade: ${item.quantidade}\n\n`;
+    texto += `Quantidade desejada: ${item.quantidade}\n\n`;
   });
 
-  texto += `Produtos distintos: ${cotacao.length}\n`;
-  texto += `Total de itens solicitados: ${totalItens}`;
+  return texto.trim();
+}
 
-  return texto;
+function perguntarManterOuLimpar() {
+  const limpar = confirm("Cotação concluída. Deseja limpar o carrinho?\n\nOK = Limpar carrinho\nCancelar = Manter carrinho");
+
+  if (limpar) {
+    cotacao = [];
+    salvarCotacao();
+    renderizarCotacao();
+    mostrarToast("Carrinho limpo.");
+  } else {
+    mostrarToast("Carrinho mantido.");
+  }
 }
 
 function copiarCotacao() {
@@ -656,7 +705,10 @@ function copiarCotacao() {
   }
 
   navigator.clipboard.writeText(gerarTextoCotacao())
-    .then(() => alert("Cotação copiada com sucesso."))
+    .then(() => {
+      mostrarToast("Cotação copiada com sucesso.");
+      perguntarManterOuLimpar();
+    })
     .catch(() => alert("Não foi possível copiar a cotação."));
 }
 
@@ -688,7 +740,7 @@ async function gerarPdfCotacao() {
   const nomeInformado = document.getElementById("nomePdf").value.trim();
 
   if (!nomeInformado) {
-    alert("Informe a Razão Social ou o Comprador Responsável para nomear o PDF.");
+    alert("Informe a Razão Social da loja ou o Comprador responsável para nomear o PDF.");
     return;
   }
 
@@ -708,7 +760,7 @@ async function gerarPdfCotacao() {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`Cliente/Comprador: ${nomeInformado}`, 14, 51);
+  doc.text(`Razão Social/Comprador: ${nomeInformado}`, 14, 51);
   doc.text(`Data: ${dataAtual}`, 14, 58);
   doc.text(`Produtos distintos: ${cotacao.length}`, 14, 65);
   doc.text(`Total de itens solicitados: ${totalItens}`, 14, 72);
@@ -721,7 +773,7 @@ async function gerarPdfCotacao() {
   ]);
 
   doc.autoTable({
-    startY: 80,
+    startY: 82,
     head: [["Código", "Descrição", "EAN", "Quantidade"]],
     body: linhas,
     styles: {
@@ -740,8 +792,20 @@ async function gerarPdfCotacao() {
     }
   });
 
+  const yFinal = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(8);
+  doc.text(
+    "Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização.",
+    14,
+    yFinal,
+    { maxWidth: 180 }
+  );
+
   const nomeArquivo = `COTACAO_${limparNomeArquivo(nomeInformado)}.pdf`;
   doc.save(nomeArquivo);
+
+  mostrarToast("PDF gerado com sucesso.");
+  perguntarManterOuLimpar();
 }
 
 function abrirCotacao() {
@@ -788,6 +852,19 @@ function fecharMenu() {
   document.getElementById("menuLateral").classList.remove("aberto");
 }
 
+let toastTimer = null;
+
+function mostrarToast(mensagem) {
+  const toast = document.getElementById("toast");
+  toast.innerText = mensagem;
+  toast.classList.add("visivel");
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove("visivel");
+  }, 2600);
+}
+
 document.getElementById("buscaPrincipal").addEventListener("input", aplicarFiltros);
 document.getElementById("buscaCodigoFornecedor").addEventListener("input", aplicarFiltros);
 
@@ -806,6 +883,7 @@ document.getElementById("filtroEstoque").addEventListener("change", () => {
 
 document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
 document.getElementById("btnCotacao").addEventListener("click", abrirCotacao);
+document.getElementById("btnCarrinhoFlutuante").addEventListener("click", abrirCotacao);
 document.getElementById("fecharCotacao").addEventListener("click", fecharCotacao);
 document.getElementById("overlayCotacao").addEventListener("click", fecharCotacao);
 document.getElementById("copiarCotacao").addEventListener("click", copiarCotacao);
@@ -844,12 +922,15 @@ document.addEventListener("click", function(event) {
 });
 
 const btnTopo = document.getElementById("btnTopo");
+const btnCarrinhoFlutuante = document.getElementById("btnCarrinhoFlutuante");
 
 window.addEventListener("scroll", () => {
   if (window.scrollY > 300) {
     btnTopo.classList.add("visivel");
+    btnCarrinhoFlutuante.classList.add("visivel");
   } else {
     btnTopo.classList.remove("visivel");
+    btnCarrinhoFlutuante.classList.remove("visivel");
   }
 });
 
