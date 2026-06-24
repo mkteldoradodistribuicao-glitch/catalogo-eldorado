@@ -4,7 +4,8 @@ let cotacao = [];
 let modoAtual = "eldorado";
 let paginaAtual = 1;
 
-const ITENS_POR_PAGINA = 150;
+const ITENS_POR_PAGINA_DESKTOP = 150;
+const ITENS_POR_PAGINA_MOBILE = 80;
 const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
 const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
 const AVISO_ESTOQUE = "⚠️ Verifique a disponibilidade de estoque antes de finalizar esta cotação.";
@@ -507,6 +508,12 @@ function aplicarFiltros() {
   mostrarProdutos();
 }
 
+function obterItensPorPagina() {
+  return window.matchMedia("(max-width: 700px)").matches
+    ? ITENS_POR_PAGINA_MOBILE
+    : ITENS_POR_PAGINA_DESKTOP;
+}
+
 function renderizarPaginacao(container, totalPaginas) {
   container.innerHTML = "";
 
@@ -549,7 +556,8 @@ function mostrarProdutos() {
   paginacaoSuperior.innerHTML = "";
 
   const totalProdutos = produtosFiltrados.length;
-  const totalPaginas = Math.max(1, Math.ceil(totalProdutos / ITENS_POR_PAGINA));
+  const itensPorPagina = obterItensPorPagina();
+  const totalPaginas = Math.max(1, Math.ceil(totalProdutos / itensPorPagina));
 
   if (paginaAtual > totalPaginas) {
     paginaAtual = totalPaginas;
@@ -561,8 +569,8 @@ function mostrarProdutos() {
     return;
   }
 
-  const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
-  const fim = inicio + ITENS_POR_PAGINA;
+  const inicio = (paginaAtual - 1) * itensPorPagina;
+  const fim = inicio + itensPorPagina;
   const produtosDaPagina = produtosFiltrados.slice(inicio, fim);
 
   contador.innerText = `${totalProdutos} produtos encontrados • Página ${paginaAtual} de ${totalPaginas}`;
@@ -1032,6 +1040,17 @@ btnTopo.addEventListener("click", () => {
     top: 0,
     behavior: "smooth"
   });
+});
+
+window.addEventListener("resize", () => {
+  if (!produtosFiltrados.length) return;
+
+  paginaAtual = Math.min(
+    paginaAtual,
+    Math.max(1, Math.ceil(produtosFiltrados.length / obterItensPorPagina()))
+  );
+
+  mostrarProdutos();
 });
 
 document.getElementById("ordenacao").value = "maior-estoque";
