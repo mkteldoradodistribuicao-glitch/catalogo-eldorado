@@ -914,6 +914,8 @@ function salvarCotacaoNoHistorico() {
 
 
 function mostrarEfeitoCotacaoSalva() {
+  animarCotacaoParaHistorico();
+
   const efeito = document.getElementById("efeitoCotacaoSalva");
 
   if (!efeito) {
@@ -921,13 +923,39 @@ function mostrarEfeitoCotacaoSalva() {
     return;
   }
 
-  efeito.classList.remove("visivel");
-  void efeito.offsetWidth;
-  efeito.classList.add("visivel");
-
   setTimeout(() => {
     efeito.classList.remove("visivel");
-  }, 1500);
+    void efeito.offsetWidth;
+    efeito.classList.add("visivel");
+
+    setTimeout(() => {
+      efeito.classList.remove("visivel");
+    }, 1500);
+  }, 650);
+}
+
+function animarCotacaoParaHistorico() {
+  const efeito = document.getElementById("efeitoArrastarHistorico");
+  const destino = document.getElementById("atalhoHistoricoCotacao") || document.getElementById("btnHistorico");
+
+  if (!efeito || !destino) return;
+
+  const rect = destino.getBoundingClientRect();
+  const destinoX = rect.left + rect.width / 2 - window.innerWidth / 2;
+  const destinoY = rect.top + rect.height / 2 - window.innerHeight / 2;
+
+  efeito.style.setProperty("--destino-x", `${destinoX}px`);
+  efeito.style.setProperty("--destino-y", `${destinoY}px`);
+  efeito.classList.remove("animar");
+  void efeito.offsetWidth;
+  efeito.classList.add("animar");
+
+  destino.classList.remove("destacado");
+  setTimeout(() => destino.classList.add("destacado"), 650);
+  setTimeout(() => {
+    efeito.classList.remove("animar");
+    destino.classList.remove("destacado");
+  }, 1300);
 }
 
 function textoCotacaoHistorico(registro) {
@@ -953,6 +981,23 @@ function compartilharHistoricoWhatsApp(id) {
 
   const texto = encodeURIComponent(textoCotacaoHistorico(registro));
   window.open(`https://wa.me/?text=${texto}`, "_blank");
+}
+
+function editarHistoricoCotacao(id) {
+  const registro = historicoCotacoes.find(item => String(item.id) === String(id));
+  if (!registro) return;
+
+  const substituir = !cotacao.length || confirm("Deseja carregar esta cotação salva para edição? A lista atual será substituída.");
+  if (!substituir) return;
+
+  cotacao = registro.itens.map(item => ({ ...item }));
+  document.getElementById("nomePdf").value = registro.razaoSocial || registro.titulo || "";
+  document.getElementById("cnpjCliente").value = registro.cnpj || "";
+  salvarCotacao();
+  renderizarCotacao();
+  fecharHistorico();
+  abrirCotacao();
+  mostrarToast("Cotação carregada para edição.");
 }
 
 function removerHistoricoCotacao(id) {
@@ -983,11 +1028,13 @@ function renderizarHistoricoCotacoes() {
       <p>${registro.data}</p>
       <p>${registro.itens.length} produtos na cotação</p>
       <div class="historico-acoes">
+        <button type="button" class="btn-editar-historico">Editar cotação</button>
         <button type="button" class="btn-whatsapp">Compartilhar via WhatsApp</button>
         <button type="button" class="btn-remover-historico">Remover</button>
       </div>
     `;
 
+    div.querySelector(".btn-editar-historico").addEventListener("click", () => editarHistoricoCotacao(registro.id));
     div.querySelector(".btn-whatsapp").addEventListener("click", () => compartilharHistoricoWhatsApp(registro.id));
     div.querySelector(".btn-remover-historico").addEventListener("click", () => removerHistoricoCotacao(registro.id));
     lista.appendChild(div);

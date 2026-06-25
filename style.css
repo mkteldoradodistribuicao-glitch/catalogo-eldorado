@@ -449,40 +449,44 @@ body.tema-ternura {
 
 
 .card.produto-adicionado {
-  animation: efeitoAdicionado 0.75s ease;
+  animation: efeitoAdicionado 0.9s ease;
   border-top-color: var(--cor-secundaria);
+  overflow: hidden;
+}
+
+.card.produto-adicionado::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 150, 57, 0.12);
+  border: 2px solid var(--cor-principal);
+  border-radius: 18px;
+  z-index: 4;
+  pointer-events: none;
 }
 
 .card.produto-adicionado::after {
-  content: "✓ Adicionado";
+  content: "✓ CONFIRMADO";
   position: absolute;
-  top: 12px;
-  left: 12px;
-  background: var(--cor-principal);
-  color: white;
-  padding: 7px 11px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: bold;
-  box-shadow: 0 5px 14px rgba(0,0,0,0.18);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.78);
+  color: var(--cor-principal);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.85);
   z-index: 5;
+  pointer-events: none;
 }
 
 @keyframes efeitoAdicionado {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  }
-
-  35% {
-    transform: scale(1.025);
-    box-shadow: 0 0 0 4px rgba(0, 150, 57, 0.16), 0 12px 28px rgba(0,0,0,0.16);
-  }
-
-  100% {
-    transform: scale(1);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  }
+  0% { transform: scale(1); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+  35% { transform: scale(1.025); box-shadow: 0 0 0 5px rgba(0, 150, 57, 0.18), 0 12px 28px rgba(0,0,0,0.16); }
+  100% { transform: scale(1); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
 }
 
 .paginacao {
@@ -675,6 +679,66 @@ body.tema-ternura {
 
 .acoes-cotacao .botao-perigo {
   background: #b82323;
+}
+
+.atalho-historico-cotacao {
+  width: 100%;
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--cor-principal);
+  border-radius: 14px;
+  background: var(--cor-suave);
+  color: var(--cor-principal);
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.atalho-historico-cotacao.destacado {
+  animation: pulsoHistorico 0.85s ease;
+}
+
+@keyframes pulsoHistorico {
+  0%, 100% { transform: scale(1); box-shadow: none; }
+  45% { transform: scale(1.035); box-shadow: 0 0 0 5px rgba(0, 150, 57, 0.16); }
+}
+
+.efeito-arrastar-historico {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  z-index: 220;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.efeito-arrastar-historico span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 150px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: white;
+  color: var(--cor-principal);
+  font-weight: 900;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.24);
+  border: 2px solid var(--cor-principal);
+}
+
+.efeito-arrastar-historico.animar {
+  animation: arrastarParaHistorico 0.95s ease forwards;
+}
+
+@keyframes arrastarParaHistorico {
+  0% { opacity: 0; transform: translate(-50%, -35%) scale(0.92); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  78% { opacity: 1; transform: translate(var(--destino-x, -50%), var(--destino-y, -50%)) scale(0.62); }
+  100% { opacity: 0; transform: translate(var(--destino-x, -50%), var(--destino-y, -50%)) scale(0.36); }
 }
 
 .overlay-cotacao {
