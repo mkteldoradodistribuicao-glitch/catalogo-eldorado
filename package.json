@@ -1,0 +1,18 @@
+{
+  "name": "catalogo-eldorado",
+  "version": "1.0.0",
+  "description": "Catálogo Eldorado - Consulta de produtos",
+  "scripts": {
+    "dev": "npx http-server -p 3000",
+    "test": "echo \"No tests specified\""
+  },
+  "keywords": [
+    "catalogo",
+    "eldorado"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
+  }
+}
