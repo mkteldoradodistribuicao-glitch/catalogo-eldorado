@@ -614,6 +614,10 @@ function mostrarProdutos() {
     const caminhoImagem = produto.imagem ? `Imagens/${produto.imagem}` : "";
 
     card.innerHTML = `
+      <button class="btn-favorito ${produtoEstaFavorito(produto) ? "ativo" : ""}" type="button" title="Favoritar produto" aria-label="Favoritar produto">
+        ${produtoEstaFavorito(produto) ? "★" : "☆"}
+      </button>
+
       <div class="card-imagem">
         ${produto.novidade ? `<span class="selo-novidade">NOVIDADE</span>` : ""}
         ${
@@ -632,7 +636,6 @@ function mostrarProdutos() {
       <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
 
       <div class="card-acoes">
-        <button class="btn-favorito ${produtoEstaFavorito(produto) ? "ativo" : ""}" type="button" title="Favoritar produto">${produtoEstaFavorito(produto) ? "⭐ Favorito" : "☆ Favoritar"}</button>
         <button class="btn-adicionar-cotacao" type="button" title="Adicionar à cotação">🛒 Adicionar à cotação</button>
       </div>
     `;
@@ -1326,6 +1329,11 @@ document.getElementById("btnHistorico").addEventListener("click", () => {
   abrirHistorico();
   fecharMenu();
 });
+
+const atalhoHistoricoCotacao = document.getElementById("atalhoHistoricoCotacao");
+if (atalhoHistoricoCotacao) {
+  atalhoHistoricoCotacao.addEventListener("click", abrirHistorico);
+}
 
 document.getElementById("fecharHistorico").addEventListener("click", fecharHistorico);
 document.getElementById("overlayHistorico").addEventListener("click", fecharHistorico);

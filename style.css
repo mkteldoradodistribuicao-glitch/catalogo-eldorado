@@ -472,9 +472,9 @@ body.tema-ternura {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.78);
+  background: rgba(255,255,255,0.86);
   color: var(--cor-principal);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 900;
   letter-spacing: 0.8px;
   text-align: center;
@@ -683,18 +683,45 @@ body.tema-ternura {
 
 .atalho-historico-cotacao {
   width: 100%;
-  margin: 4px 0 12px;
-  padding: 12px 14px;
-  border: 1px dashed var(--cor-principal);
-  border-radius: 14px;
-  background: var(--cor-suave);
-  color: var(--cor-principal);
-  font-weight: bold;
+  margin: 14px 0 12px;
+  padding: 15px 16px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--cor-principal), var(--cor-secundaria));
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.14);
+  position: relative;
+  overflow: hidden;
+}
+
+.atalho-historico-cotacao::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.24), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.45s ease;
+}
+
+.atalho-historico-cotacao:hover::after {
+  transform: translateX(100%);
+}
+
+.atalho-historico-cotacao span {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .atalho-historico-cotacao.destacado {
@@ -979,19 +1006,35 @@ body.tema-ternura {
 }
 
 .btn-favorito {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--cor-principal);
-  border-radius: 12px;
-  background: white;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.94);
   color: var(--cor-principal);
-  font-size: 13px;
-  font-weight: bold;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
   cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.14);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn-favorito:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
 }
 
 .btn-favorito.ativo {
-  background: var(--cor-suave);
+  background: var(--cor-principal);
+  color: #ffffff;
 }
 
 .painel-historico {
@@ -1040,6 +1083,11 @@ body.tema-ternura {
   color: white;
   font-weight: bold;
   cursor: pointer;
+}
+
+.btn-editar-historico {
+  background: var(--cor-principal);
+  color: #ffffff;
 }
 
 .btn-whatsapp {
