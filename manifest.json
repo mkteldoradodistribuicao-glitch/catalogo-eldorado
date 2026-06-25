@@ -1,0 +1,12 @@
+{
+  "name": "Catálogo Eldorado",
+  "short_name": "Eldorado",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#009639",
+  "icons": [
+    { "src": "Logos/Favicon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "Logos/Favicon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Catálogo Eldorado</title>
   <link rel="icon" type="image/png" href="Logos/Favicon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#009639" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="tema-eldorado">
@@ -32,6 +34,9 @@
       <button id="btnCatalogoEldorado" type="button">Catálogo Eldorado</button>
       <button id="btnProdutosTernura" type="button">Produtos Ternura</button>
       <button id="btnNovidades" type="button">Novidades</button>
+      <button id="btnFavoritos" type="button">⭐ Favoritos</button>
+      <button id="btnHistorico" type="button">Histórico de Cotações</button>
+      <button id="btnScanner" type="button">📷 Scanner EAN</button>
     </nav>
   </header>
 
@@ -98,12 +103,41 @@
     <div class="acoes-cotacao">
       <button id="limparCotacao" type="button" class="botao-perigo">Limpar carrinho</button>
       <button id="gerarPdf" type="button">Gerar Cotação em PDF</button>
-      <button id="copiarCotacao" type="button">Copiar cotação</button>
+      <button id="salvarCotacao" type="button">Salvar Cotação</button>
     </div>
   </aside>
 
   <div id="overlayCotacao" class="overlay-cotacao"></div>
+
+  <aside id="painelHistorico" class="painel-cotacao painel-historico">
+    <div class="painel-cabecalho">
+      <h2>Histórico de Cotações</h2>
+      <button id="fecharHistorico" type="button">×</button>
+    </div>
+    <div id="listaHistoricoCotacoes" class="lista-historico-cotacoes"></div>
+  </aside>
+
+  <div id="overlayHistorico" class="overlay-cotacao"></div>
+
+  <div id="modalScanner" class="modal-scanner">
+    <div class="scanner-conteudo">
+      <div class="painel-cabecalho">
+        <h2>Scanner de Código de Barras</h2>
+        <button id="fecharScanner" type="button">×</button>
+      </div>
+      <video id="videoScanner" playsinline></video>
+      <p>Aponte a câmera para o EAN do produto.</p>
+    </div>
+  </div>
   <div id="toast" class="toast"></div>
+
+  <div id="efeitoCotacaoSalva" class="efeito-cotacao-salva" aria-hidden="true">
+    <div class="efeito-salva-card">
+      <div class="efeito-salva-icone">✓</div>
+      <strong>Cotação salva!</strong>
+      <span>A lista foi transferida para o Histórico de Cotações.</span>
+    </div>
+  </div>
 
   <div class="botoes-flutuantes">
     <button id="btnCarrinhoFlutuante" class="btn-flutuante btn-carrinho-flutuante" type="button" aria-label="Abrir carrinho">
@@ -116,5 +150,10 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="script.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  </script>
 </body>
 </html>

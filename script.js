@@ -1,6 +1,9 @@
 let produtos = [];
 let produtosFiltrados = [];
 let cotacao = [];
+let favoritos = [];
+let historicoCotacoes = [];
+let scannerStream = null;
 let modoAtual = "eldorado";
 let paginaAtual = 1;
 
@@ -9,6 +12,8 @@ const ITENS_POR_PAGINA_MOBILE = 80;
 const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
 const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
 const AVISO_ESTOQUE = "⚠️ Verifique a disponibilidade de estoque antes de finalizar esta cotação.";
+const CHAVE_FAVORITOS = "favoritosCatalogoEldorado";
+const CHAVE_HISTORICO = "historicoCotacoesEldorado";
 
 const CONFIG = {
   eldorado: {
@@ -33,7 +38,17 @@ const CONFIG = {
     logo: "Logos/Eldorado.png",
     tema: "tema-eldorado",
     filtroTernura: false,
-    filtroNovidade: true
+    filtroNovidade: true,
+    filtroFavoritos: false
+  },
+  favoritos: {
+    titulo: "Favoritos",
+    subtitulo: "Produtos marcados como favoritos para acesso rápido.",
+    logo: "Logos/Eldorado.png",
+    tema: "tema-eldorado",
+    filtroTernura: false,
+    filtroNovidade: false,
+    filtroFavoritos: true
   }
 };
 
@@ -61,6 +76,8 @@ async function carregarProdutos() {
       .filter(produto => produto.codigo || produto.descricao || produto.ean);
 
     marcarNovidades();
+    carregarFavoritos();
+    carregarHistoricoCotacoes();
     carregarCotacaoSalva();
     aplicarFiltros();
 
@@ -180,6 +197,10 @@ function produtosDoModo() {
     lista = lista.filter(produto => produto.novidade);
   }
 
+  if (config.filtroFavoritos) {
+    lista = lista.filter(produto => favoritos.includes(String(produto.codigo).trim()));
+  }
+
   return lista;
 }
 
@@ -225,14 +246,13 @@ function calcularRelevancia(produto, buscaPrincipal) {
 
   if (codigo === busca) return 1;
   if (codigo.startsWith(busca)) return 2;
+  if (codigo.includes(busca)) return 3;
 
-  if (descricao === busca) return 3;
-  if (descricao.startsWith(descricaoDigitada)) return 4;
-  if (descricao.startsWith(primeiraPalavra) && todosNaDescricao) return 5;
-  if (todosNaOrdem) return 6;
-  if (todosNaDescricao) return 7;
-
-  if (codigo.includes(busca)) return 8;
+  if (descricao === busca) return 4;
+  if (descricao.startsWith(descricaoDigitada)) return 5;
+  if (descricao.startsWith(primeiraPalavra) && todosNaDescricao) return 6;
+  if (todosNaOrdem) return 7;
+  if (todosNaDescricao) return 8;
 
   if (ean.startsWith(busca)) return 9;
   if (ean.includes(busca)) return 10;
@@ -252,34 +272,49 @@ function produtoCombinaBuscaPrincipal(produto, buscaPrincipal) {
   return produto.relevancia < 999;
 }
 
+function calcularRelevanciaCodigoFornecedor(produto, buscaCodigoFornecedor) {
+  const termos = dividirTermos(buscaCodigoFornecedor);
+
+  if (!termos.length) {
+    produto.relevanciaCodigoFornecedor = 999;
+    return 999;
+  }
+
+  const codigoFornecedor = normalizar(produto.codigoFornecedor);
+  const buscaCompleta = termos.join("");
+
+  if (!codigoFornecedor) return 999;
+  if (codigoFornecedor === buscaCompleta) return 1;
+  if (codigoFornecedor.startsWith(buscaCompleta)) return 2;
+  if (termos.every(termo => codigoFornecedor.includes(termo))) return 3;
+
+  return 999;
+}
+
 function ordenarProdutos(lista) {
   const tipoOrdenacao = document.getElementById("ordenacao").value;
   const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
+  const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value.trim();
   const existeBuscaPrincipal = dividirTermos(buscaPrincipal).length > 0;
+  const existeBuscaCodigoFornecedor = dividirTermos(buscaCodigoFornecedor).length > 0;
   const listaOrdenada = [...lista];
 
-  if (modoAtual === "novidades") {
-    listaOrdenada.sort((a, b) => {
-      if (existeBuscaPrincipal && a.relevancia !== b.relevancia) {
-        return a.relevancia - b.relevancia;
-      }
+  listaOrdenada.sort((a, b) => {
+    if (existeBuscaCodigoFornecedor && a.relevanciaCodigoFornecedor !== b.relevanciaCodigoFornecedor) {
+      return a.relevanciaCodigoFornecedor - b.relevanciaCodigoFornecedor;
+    }
 
+    if (existeBuscaPrincipal && a.relevancia !== b.relevancia) {
+      return a.relevancia - b.relevancia;
+    }
+
+    if (modoAtual === "novidades") {
       return compararCodigo(b, a);
-    });
+    }
 
-    return listaOrdenada;
-  }
+    return aplicarOrdenacaoEscolhida(a, b, tipoOrdenacao);
+  });
 
-  if (existeBuscaPrincipal) {
-    listaOrdenada.sort((a, b) => {
-      if (a.relevancia !== b.relevancia) return a.relevancia - b.relevancia;
-      return aplicarOrdenacaoEscolhida(a, b, tipoOrdenacao);
-    });
-
-    return listaOrdenada;
-  }
-
-  listaOrdenada.sort((a, b) => aplicarOrdenacaoEscolhida(a, b, tipoOrdenacao));
   return listaOrdenada;
 }
 
@@ -485,12 +520,9 @@ function aplicarFiltros() {
   resultado = aplicarFiltroEstoque(resultado);
 
   resultado = resultado.filter(produto => {
-    const textoCodigoFornecedor = normalizar(produto.codigoFornecedor);
+    produto.relevanciaCodigoFornecedor = calcularRelevanciaCodigoFornecedor(produto, buscaCodigoFornecedor);
 
-    const encontrouCodigoFornecedor = termosCodigoFornecedor.every(termo =>
-      textoCodigoFornecedor.includes(termo)
-    );
-
+    const encontrouCodigoFornecedor = !termosCodigoFornecedor.length || produto.relevanciaCodigoFornecedor < 999;
     const encontrouFornecedor = fornecedorCombina(produto.fornecedor, buscaFornecedor);
 
     return encontrouCodigoFornecedor && encontrouFornecedor;
@@ -599,8 +631,15 @@ function mostrarProdutos() {
       <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
       <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
 
-      <button class="btn-adicionar-cotacao" type="button" title="Adicionar à cotação">🛒 Adicionar à cotação</button>
+      <div class="card-acoes">
+        <button class="btn-favorito ${produtoEstaFavorito(produto) ? "ativo" : ""}" type="button" title="Favoritar produto">${produtoEstaFavorito(produto) ? "⭐ Favorito" : "☆ Favoritar"}</button>
+        <button class="btn-adicionar-cotacao" type="button" title="Adicionar à cotação">🛒 Adicionar à cotação</button>
+      </div>
     `;
+
+    card.querySelector(".btn-favorito").addEventListener("click", () => {
+      alternarFavorito(produto);
+    });
 
     card.querySelector(".btn-adicionar-cotacao").addEventListener("click", () => {
       adicionarNaCotacao(produto);
@@ -665,6 +704,54 @@ function atualizarQuantidade(codigo, quantidade) {
 
 function salvarCotacao() {
   localStorage.setItem("cotacaoEldorado", JSON.stringify(cotacao));
+}
+
+function carregarFavoritos() {
+  try {
+    favoritos = JSON.parse(localStorage.getItem(CHAVE_FAVORITOS)) || [];
+  } catch {
+    favoritos = [];
+  }
+}
+
+function salvarFavoritos() {
+  localStorage.setItem(CHAVE_FAVORITOS, JSON.stringify(favoritos));
+}
+
+function produtoEstaFavorito(produto) {
+  return favoritos.includes(String(produto.codigo).trim());
+}
+
+function alternarFavorito(produto) {
+  const codigo = String(produto.codigo).trim();
+
+  if (favoritos.includes(codigo)) {
+    favoritos = favoritos.filter(item => item !== codigo);
+    mostrarToast("Produto removido dos favoritos.");
+  } else {
+    favoritos.push(codigo);
+    mostrarToast("Produto adicionado aos favoritos.");
+  }
+
+  salvarFavoritos();
+
+  if (modoAtual === "favoritos") {
+    aplicarFiltros();
+  } else {
+    mostrarProdutos();
+  }
+}
+
+function carregarHistoricoCotacoes() {
+  try {
+    historicoCotacoes = JSON.parse(localStorage.getItem(CHAVE_HISTORICO)) || [];
+  } catch {
+    historicoCotacoes = [];
+  }
+}
+
+function salvarHistoricoCotacoes() {
+  localStorage.setItem(CHAVE_HISTORICO, JSON.stringify(historicoCotacoes));
 }
 
 function carregarCotacaoSalva() {
@@ -783,18 +870,141 @@ function perguntarManterOuLimpar() {
   }
 }
 
-function copiarCotacao() {
+function obterTituloCotacao() {
+  const nomeInformado = document.getElementById("nomePdf").value.trim();
+
+  if (nomeInformado) return nomeInformado;
+
+  const titulo = prompt("Informe um título para salvar esta cotação no histórico:");
+  return String(titulo || "").trim();
+}
+
+function salvarCotacaoNoHistorico() {
   if (!cotacao.length) {
     alert("Nenhum produto foi adicionado à cotação.");
     return;
   }
 
-  navigator.clipboard.writeText(gerarTextoCotacao())
-    .then(() => {
-      mostrarToast("Cotação copiada com sucesso.");
-      perguntarManterOuLimpar();
-    })
-    .catch(() => alert("Não foi possível copiar a cotação."));
+  const titulo = obterTituloCotacao();
+
+  if (!titulo) {
+    alert("Para salvar no histórico, informe a Razão Social ou um título para a cotação.");
+    return;
+  }
+
+  const registro = {
+    id: Date.now(),
+    titulo,
+    data: new Date().toLocaleString("pt-BR"),
+    razaoSocial: document.getElementById("nomePdf").value.trim(),
+    cnpj: document.getElementById("cnpjCliente").value.trim(),
+    itens: cotacao.map(item => ({ ...item })),
+    texto: gerarTextoCotacao()
+  };
+
+  historicoCotacoes.unshift(registro);
+  historicoCotacoes = historicoCotacoes.slice(0, 60);
+  salvarHistoricoCotacoes();
+  renderizarHistoricoCotacoes();
+  mostrarEfeitoCotacaoSalva();
+  setTimeout(() => {
+    perguntarManterOuLimpar();
+  }, 900);
+}
+
+
+function mostrarEfeitoCotacaoSalva() {
+  const efeito = document.getElementById("efeitoCotacaoSalva");
+
+  if (!efeito) {
+    mostrarToast("Cotação salva no histórico.");
+    return;
+  }
+
+  efeito.classList.remove("visivel");
+  void efeito.offsetWidth;
+  efeito.classList.add("visivel");
+
+  setTimeout(() => {
+    efeito.classList.remove("visivel");
+  }, 1500);
+}
+
+function textoCotacaoHistorico(registro) {
+  let texto = "SOLICITAÇÃO DE COTAÇÃO\n";
+  texto += `Título: ${registro.titulo}\n`;
+  if (registro.razaoSocial) texto += `Razão Social/Comprador: ${registro.razaoSocial}\n`;
+  if (registro.cnpj) texto += `CNPJ: ${registro.cnpj}\n`;
+  texto += `Data: ${registro.data}\n\n`;
+
+  registro.itens.forEach((item, index) => {
+    texto += `${index + 1}) Código do Produto: ${item.codigo}\n`;
+    texto += `Descrição: ${item.descricao || "Não informada"}\n`;
+    texto += `EAN: ${item.ean || "Não informado"}\n`;
+    texto += `Quantidade desejada: ${item.quantidade}\n\n`;
+  });
+
+  return texto.trim();
+}
+
+function compartilharHistoricoWhatsApp(id) {
+  const registro = historicoCotacoes.find(item => String(item.id) === String(id));
+  if (!registro) return;
+
+  const texto = encodeURIComponent(textoCotacaoHistorico(registro));
+  window.open(`https://wa.me/?text=${texto}`, "_blank");
+}
+
+function removerHistoricoCotacao(id) {
+  const confirmar = confirm("Deseja remover esta cotação do histórico?");
+  if (!confirmar) return;
+
+  historicoCotacoes = historicoCotacoes.filter(item => String(item.id) !== String(id));
+  salvarHistoricoCotacoes();
+  renderizarHistoricoCotacoes();
+}
+
+function renderizarHistoricoCotacoes() {
+  const lista = document.getElementById("listaHistoricoCotacoes");
+  if (!lista) return;
+
+  lista.innerHTML = "";
+
+  if (!historicoCotacoes.length) {
+    lista.innerHTML = "<p>Nenhuma cotação salva no histórico.</p>";
+    return;
+  }
+
+  historicoCotacoes.forEach(registro => {
+    const div = document.createElement("div");
+    div.className = "item-historico-cotacao";
+    div.innerHTML = `
+      <strong>${registro.titulo}</strong>
+      <p>${registro.data}</p>
+      <p>${registro.itens.length} produtos na cotação</p>
+      <div class="historico-acoes">
+        <button type="button" class="btn-whatsapp">Compartilhar via WhatsApp</button>
+        <button type="button" class="btn-remover-historico">Remover</button>
+      </div>
+    `;
+
+    div.querySelector(".btn-whatsapp").addEventListener("click", () => compartilharHistoricoWhatsApp(registro.id));
+    div.querySelector(".btn-remover-historico").addEventListener("click", () => removerHistoricoCotacao(registro.id));
+    lista.appendChild(div);
+  });
+}
+
+function abrirHistorico() {
+  renderizarHistoricoCotacoes();
+  document.getElementById("painelHistorico").classList.add("aberto");
+  document.getElementById("overlayHistorico").classList.add("aberto");
+  document.body.classList.add("cotacao-aberta");
+}
+
+function fecharHistorico() {
+  document.getElementById("painelHistorico").classList.remove("aberto");
+  document.getElementById("overlayHistorico").classList.remove("aberto");
+  document.body.classList.remove("cotacao-aberta");
 }
 
 function limparCotacao() {
@@ -961,6 +1171,59 @@ function mostrarToast(mensagem) {
   }, 2600);
 }
 
+
+async function abrirScanner() {
+  if (!('BarcodeDetector' in window)) {
+    alert('Scanner não disponível neste navegador. Use Chrome/Edge no celular ou pesquise pelo EAN manualmente.');
+    return;
+  }
+
+  const modal = document.getElementById('modalScanner');
+  const video = document.getElementById('videoScanner');
+  modal.classList.add('aberto');
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = scannerStream;
+    await video.play();
+
+    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'] });
+
+    const ler = async () => {
+      if (!modal.classList.contains('aberto')) return;
+
+      try {
+        const codigos = await detector.detect(video);
+        if (codigos.length) {
+          const codigo = codigos[0].rawValue;
+          fecharScanner();
+          document.getElementById('buscaPrincipal').value = codigo;
+          paginaAtual = 1;
+          aplicarFiltros();
+          mostrarToast(`Código lido: ${codigo}`);
+          return;
+        }
+      } catch {}
+
+      requestAnimationFrame(ler);
+    };
+
+    ler();
+  } catch {
+    fecharScanner();
+    alert('Não foi possível acessar a câmera do dispositivo.');
+  }
+}
+
+function fecharScanner() {
+  document.getElementById('modalScanner').classList.remove('aberto');
+
+  if (scannerStream) {
+    scannerStream.getTracks().forEach(track => track.stop());
+    scannerStream = null;
+  }
+}
+
 document.getElementById("buscaPrincipal").addEventListener("input", aplicarFiltros);
 document.getElementById("buscaCodigoFornecedor").addEventListener("input", aplicarFiltros);
 
@@ -987,7 +1250,7 @@ document.getElementById("btnCotacao").addEventListener("click", abrirCotacao);
 document.getElementById("btnCarrinhoFlutuante").addEventListener("click", abrirCotacao);
 document.getElementById("fecharCotacao").addEventListener("click", fecharCotacao);
 document.getElementById("overlayCotacao").addEventListener("click", fecharCotacao);
-document.getElementById("copiarCotacao").addEventListener("click", copiarCotacao);
+document.getElementById("salvarCotacao").addEventListener("click", salvarCotacaoNoHistorico);
 document.getElementById("limparCotacao").addEventListener("click", limparCotacao);
 document.getElementById("gerarPdf").addEventListener("click", gerarPdfCotacao);
 
@@ -1007,6 +1270,24 @@ document.getElementById("btnProdutosTernura").addEventListener("click", () => {
 document.getElementById("btnNovidades").addEventListener("click", () => {
   trocarModo("novidades");
 });
+
+document.getElementById("btnFavoritos").addEventListener("click", () => {
+  trocarModo("favoritos");
+});
+
+document.getElementById("btnHistorico").addEventListener("click", () => {
+  abrirHistorico();
+  fecharMenu();
+});
+
+document.getElementById("fecharHistorico").addEventListener("click", fecharHistorico);
+document.getElementById("overlayHistorico").addEventListener("click", fecharHistorico);
+
+document.getElementById("btnScanner").addEventListener("click", () => {
+  abrirScanner();
+  fecharMenu();
+});
+document.getElementById("fecharScanner").addEventListener("click", fecharScanner);
 
 document.addEventListener("click", function(event) {
   const menu = document.getElementById("menuLateral");

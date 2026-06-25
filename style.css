@@ -866,8 +866,12 @@ body.tema-ternura {
     width: 100vw;
     max-width: 100vw;
     right: -100vw;
+    height: 100dvh;
+    max-height: 100dvh;
     padding: 14px;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .painel-cotacao.aberto {
@@ -881,22 +885,316 @@ body.tema-ternura {
   }
 
   .lista-cotacao {
-    min-height: 0;
+    flex: 0 0 auto;
+    max-height: 34dvh;
+    min-height: 120px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding-right: 6px;
+    margin-bottom: 10px;
   }
 
   .acoes-cotacao {
-    position: sticky;
-    bottom: 0;
+    position: static;
     background: white;
-    padding-bottom: 4px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    margin-top: 8px;
   }
 
   .toast {
     left: 14px;
     right: 14px;
     bottom: 88px;
+  }
+}
+
+.card-acoes {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.btn-favorito {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--cor-principal);
+  border-radius: 12px;
+  background: white;
+  color: var(--cor-principal);
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn-favorito.ativo {
+  background: var(--cor-suave);
+}
+
+.painel-historico {
+  right: -460px;
+}
+
+.lista-historico-cotacoes {
+  overflow-y: auto;
+  flex: 1;
+  padding: 14px 4px 8px 0;
+}
+
+.item-historico-cotacao {
+  border: 1px solid #eeeeee;
+  border-left: 4px solid var(--cor-principal);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.item-historico-cotacao strong {
+  display: block;
+  color: var(--cor-principal);
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.item-historico-cotacao p {
+  margin: 5px 0;
+  color: #555;
+  font-size: 13px;
+}
+
+.historico-acoes {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.historico-acoes button {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 12px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn-whatsapp {
+  background: #128c3c;
+}
+
+.btn-remover-historico {
+  background: #b82323;
+}
+
+.modal-scanner {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.72);
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.modal-scanner.aberto {
+  display: flex;
+}
+
+.scanner-conteudo {
+  width: min(520px, 96vw);
+  background: white;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+#videoScanner {
+  width: 100%;
+  max-height: 60vh;
+  background: #111;
+  border-radius: 14px;
+  margin-top: 14px;
+}
+
+.scanner-conteudo p {
+  margin: 12px 0 0;
+  color: #555;
+  font-size: 14px;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .painel-cotacao {
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: block;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .painel-cabecalho {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 5;
+  }
+
+  .lista-cotacao {
+    max-height: 36dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: none;
+    padding-right: 4px;
+    margin-bottom: 12px;
+  }
+
+  .acoes-cotacao {
+    position: static;
+    background: white;
+    padding-bottom: 12px;
+  }
+
+  .lista-historico-cotacoes {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .modal-scanner {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+}
+
+
+.efeito-cotacao-salva {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.efeito-cotacao-salva.visivel {
+  display: flex;
+  animation: fundoSalvo 1.45s ease forwards;
+}
+
+.efeito-salva-card {
+  width: min(360px, 92vw);
+  background: white;
+  border-radius: 22px;
+  padding: 26px 22px 24px;
+  text-align: center;
+  box-shadow: 0 22px 60px rgba(0,0,0,0.25);
+  border-top: 5px solid var(--cor-principal);
+  animation: cardSalvo 1.45s ease forwards;
+  position: relative;
+  overflow: hidden;
+}
+
+.efeito-salva-card::before,
+.efeito-salva-card::after {
+  content: "";
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  opacity: 0.13;
+  background: var(--cor-principal);
+}
+
+.efeito-salva-card::before {
+  top: -70px;
+  left: -50px;
+}
+
+.efeito-salva-card::after {
+  right: -70px;
+  bottom: -70px;
+  background: var(--cor-secundaria);
+}
+
+.efeito-salva-icone {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cor-principal), var(--cor-secundaria));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  font-weight: 900;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+  animation: iconeSalvo 1.45s ease forwards;
+  position: relative;
+  z-index: 1;
+}
+
+.efeito-salva-card strong {
+  display: block;
+  color: var(--cor-principal);
+  font-size: 24px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.efeito-salva-card span {
+  display: block;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.4;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes fundoSalvo {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes cardSalvo {
+  0% { opacity: 0; transform: translateY(26px) scale(0.92); }
+  18% { opacity: 1; transform: translateY(0) scale(1.02); }
+  34% { transform: scale(1); }
+  78% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: translateY(-12px) scale(0.98); }
+}
+
+@keyframes iconeSalvo {
+  0% { transform: scale(0.25) rotate(-20deg); }
+  22% { transform: scale(1.12) rotate(6deg); }
+  36% { transform: scale(1) rotate(0); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+@media (max-width: 700px) {
+  .efeito-cotacao-salva {
+    align-items: flex-start;
+    padding-top: 88px;
+  }
+
+  .efeito-salva-card {
+    width: 94vw;
+    padding: 22px 18px 20px;
+    border-radius: 20px;
+  }
+
+  .efeito-salva-icone {
+    width: 66px;
+    height: 66px;
+    font-size: 36px;
+  }
+
+  .efeito-salva-card strong {
+    font-size: 22px;
   }
 }
