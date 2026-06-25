@@ -1,0 +1,21 @@
+{
+  "name": "catalogo-eldorado",
+  "version": "1.0.0",
+  "description": "Catálogo Eldorado - Sistema de consulta de produtos",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'No build step required for static site'",
+    "lint": "echo 'No linter configured'"
+  },
+  "keywords": [
+    "catalogo",
+    "produtos",
+    "eldorado"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  }
+}
