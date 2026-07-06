@@ -1185,18 +1185,32 @@ function limparFiltros() {
   aplicarFiltros();
 }
 
+let timerTrocaCatalogo = null;
+
 function trocarModo(novoModo) {
-  modoAtual = novoModo;
-
-  const config = CONFIG[modoAtual];
-
-  document.body.className = config.tema;
-  document.getElementById("logoCatalogo").src = config.logo;
-  document.getElementById("tituloCatalogo").innerText = config.titulo;
-  document.getElementById("subtituloCatalogo").innerText = config.subtitulo;
-
-  limparFiltros();
   fecharMenu();
+
+  if (!CONFIG[novoModo]) return;
+
+  clearTimeout(timerTrocaCatalogo);
+  document.body.classList.add("trocando-catalogo");
+
+  timerTrocaCatalogo = setTimeout(() => {
+    modoAtual = novoModo;
+
+    const config = CONFIG[modoAtual];
+
+    document.body.className = `${config.tema} trocando-catalogo`;
+    document.getElementById("logoCatalogo").src = config.logo;
+    document.getElementById("tituloCatalogo").innerText = config.titulo;
+    document.getElementById("subtituloCatalogo").innerText = config.subtitulo;
+
+    limparFiltros();
+
+    setTimeout(() => {
+      document.body.classList.remove("trocando-catalogo");
+    }, 220);
+  }, 120);
 }
 
 function abrirFecharMenu() {
@@ -1222,6 +1236,41 @@ function mostrarToast(mensagem) {
 }
 
 
+async function aplicarMelhoriasCameraScanner(stream) {
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+
+  const capabilities = typeof track.getCapabilities === "function"
+    ? track.getCapabilities()
+    : {};
+
+  const advanced = [];
+
+  if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
+    advanced.push({ focusMode: "continuous" });
+  }
+
+  if (capabilities.exposureMode && capabilities.exposureMode.includes("continuous")) {
+    advanced.push({ exposureMode: "continuous" });
+  }
+
+  if (capabilities.whiteBalanceMode && capabilities.whiteBalanceMode.includes("continuous")) {
+    advanced.push({ whiteBalanceMode: "continuous" });
+  }
+
+  if (capabilities.frameRate) {
+    advanced.push({ frameRate: Math.min(30, capabilities.frameRate.max || 30) });
+  }
+
+  if (advanced.length && typeof track.applyConstraints === "function") {
+    try {
+      await track.applyConstraints({ advanced });
+    } catch {
+      // Nem todos os aparelhos/navegadores aceitam controles avançados de câmera.
+    }
+  }
+}
+
 async function abrirScanner() {
   if (!('BarcodeDetector' in window)) {
     alert('Scanner não disponível neste navegador. Use Chrome/Edge no celular ou pesquise pelo EAN manualmente.');
@@ -1233,8 +1282,25 @@ async function abrirScanner() {
   modal.classList.add('aberto');
 
   try {
-    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Câmera indisponível.');
+    }
+
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30, max: 60 }
+      },
+      audio: false
+    });
+
+    await aplicarMelhoriasCameraScanner(scannerStream);
+
     video.srcObject = scannerStream;
+    video.setAttribute('playsinline', "true");
+    video.muted = true;
     await video.play();
 
     const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'] });
@@ -1253,7 +1319,9 @@ async function abrirScanner() {
           mostrarToast(`Código lido: ${codigo}`);
           return;
         }
-      } catch {}
+      } catch {
+        // Mantém a leitura ativa mesmo que um frame falhe.
+      }
 
       requestAnimationFrame(ler);
     };

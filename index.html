@@ -129,8 +129,12 @@
         <h2>Scanner de Código de Barras</h2>
         <button id="fecharScanner" type="button">×</button>
       </div>
-      <video id="videoScanner" playsinline></video>
-      <p>Aponte a câmera para o EAN do produto.</p>
+      <div class="scanner-video-area">
+        <video id="videoScanner" playsinline muted></video>
+        <div class="scanner-mira" aria-hidden="true">
+          <span class="scanner-linha"></span>
+        </div>
+      </div>
     </div>
   </div>
   <div id="toast" class="toast"></div>
