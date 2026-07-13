@@ -4,6 +4,16 @@ let cotacao = [];
 let favoritos = [];
 let historicoCotacoes = [];
 let scannerStream = null;
+let scannerTrack = null;
+let scannerTorchLigado = false;
+let scannerHorizontalAtivo = false;
+let scannerAtivo = false;
+let scannerDetector = null;
+let scannerAnimationFrame = null;
+let scannerLeitorZXing = null;
+let scannerControleZXing = null;
+let ultimoCodigoScanner = "";
+let ultimoCodigoScannerEm = 0;
 let modoAtual = "eldorado";
 let paginaAtual = 1;
 
@@ -513,30 +523,58 @@ function aplicarFiltros() {
   const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value;
   const buscaFornecedor = document.getElementById("buscaFornecedor").value;
 
+  let resultado = aplicarFiltroEstoque(produtosDoModo());
+
+  resultado = resultado.filter(produto =>
+    fornecedorCombina(produto.fornecedor, buscaFornecedor)
+  );
+
   const termosCodigoFornecedor = dividirTermos(buscaCodigoFornecedor);
+  const codigoFornecedorDigitado = normalizar(buscaCodigoFornecedor).replace(/\s+/g, "");
 
-  let resultado = produtosDoModo();
+  if (termosCodigoFornecedor.length) {
+    const exatos = resultado.filter(produto =>
+      normalizar(produto.codigoFornecedor).replace(/\s+/g, "") === codigoFornecedorDigitado
+    );
 
-  resultado = aplicarFiltroEstoque(resultado);
+    if (exatos.length) {
+      resultado = exatos;
+      resultado.forEach(produto => {
+        produto.relevanciaCodigoFornecedor = 1;
+      });
+    } else {
+      const iniciando = resultado.filter(produto =>
+        normalizar(produto.codigoFornecedor)
+          .replace(/\s+/g, "")
+          .startsWith(codigoFornecedorDigitado)
+      );
 
-  resultado = resultado.filter(produto => {
-    produto.relevanciaCodigoFornecedor = calcularRelevanciaCodigoFornecedor(produto, buscaCodigoFornecedor);
+      if (iniciando.length) {
+        resultado = iniciando;
+        resultado.forEach(produto => {
+          produto.relevanciaCodigoFornecedor = 2;
+        });
+      } else {
+        resultado = resultado.filter(produto => {
+          produto.relevanciaCodigoFornecedor =
+            calcularRelevanciaCodigoFornecedor(produto, buscaCodigoFornecedor);
 
-    const encontrouCodigoFornecedor = !termosCodigoFornecedor.length || produto.relevanciaCodigoFornecedor < 999;
-    const encontrouFornecedor = fornecedorCombina(produto.fornecedor, buscaFornecedor);
-
-    return encontrouCodigoFornecedor && encontrouFornecedor;
-  });
+          return produto.relevanciaCodigoFornecedor < 999;
+        });
+      }
+    }
+  } else {
+    resultado.forEach(produto => {
+      produto.relevanciaCodigoFornecedor = 999;
+    });
+  }
 
   resultado = resultado.filter(produto =>
     produtoCombinaBuscaPrincipal(produto, buscaPrincipal)
   );
 
-  resultado = ordenarProdutos(resultado);
-
-  produtosFiltrados = resultado;
+  produtosFiltrados = ordenarProdutos(resultado);
   paginaAtual = 1;
-
   mostrarProdutos();
 }
 
@@ -1237,109 +1275,395 @@ function mostrarToast(mensagem) {
 
 
 async function aplicarMelhoriasCameraScanner(stream) {
-  const track = stream.getVideoTracks()[0];
-  if (!track) return;
+  scannerTrack = stream.getVideoTracks()[0] || null;
 
-  const capabilities = typeof track.getCapabilities === "function"
-    ? track.getCapabilities()
+  if (!scannerTrack) return;
+
+  const capabilities = typeof scannerTrack.getCapabilities === "function"
+    ? scannerTrack.getCapabilities()
     : {};
 
   const advanced = [];
 
-  if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
+  if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes("continuous")) {
     advanced.push({ focusMode: "continuous" });
   }
 
-  if (capabilities.exposureMode && capabilities.exposureMode.includes("continuous")) {
+  if (Array.isArray(capabilities.exposureMode) && capabilities.exposureMode.includes("continuous")) {
     advanced.push({ exposureMode: "continuous" });
   }
 
-  if (capabilities.whiteBalanceMode && capabilities.whiteBalanceMode.includes("continuous")) {
+  if (Array.isArray(capabilities.whiteBalanceMode) && capabilities.whiteBalanceMode.includes("continuous")) {
     advanced.push({ whiteBalanceMode: "continuous" });
   }
 
-  if (capabilities.frameRate) {
-    advanced.push({ frameRate: Math.min(30, capabilities.frameRate.max || 30) });
+  if (capabilities.zoom) {
+    const zoomInicial = Math.min(
+      Number(capabilities.zoom.max || 1),
+      Math.max(Number(capabilities.zoom.min || 1), 1.35)
+    );
+
+    advanced.push({ zoom: zoomInicial });
   }
 
-  if (advanced.length && typeof track.applyConstraints === "function") {
+  if (advanced.length && typeof scannerTrack.applyConstraints === "function") {
     try {
-      await track.applyConstraints({ advanced });
-    } catch {
-      // Nem todos os aparelhos/navegadores aceitam controles avançados de câmera.
+      await scannerTrack.applyConstraints({ advanced });
+    } catch (erro) {
+      console.warn("Alguns controles avançados da câmera não foram aplicados.", erro);
     }
   }
 }
 
-async function abrirScanner() {
-  if (!('BarcodeDetector' in window)) {
-    alert('Scanner não disponível neste navegador. Use Chrome/Edge no celular ou pesquise pelo EAN manualmente.');
+function configurarControlesScanner() {
+  const capabilities = scannerTrack?.getCapabilities?.() || {};
+  const settings = scannerTrack?.getSettings?.() || {};
+  const zoomArea = document.getElementById("scannerZoomArea");
+  const zoomInput = document.getElementById("scannerZoom");
+  const flashButton = document.getElementById("scannerFlash");
+
+  if (capabilities.zoom) {
+    const min = Number(capabilities.zoom.min || 1);
+    const max = Number(capabilities.zoom.max || min);
+    const step = Number(capabilities.zoom.step || 0.1);
+    const atual = Number(settings.zoom || min);
+
+    zoomInput.min = String(min);
+    zoomInput.max = String(max);
+    zoomInput.step = String(step);
+    zoomInput.value = String(atual);
+
+    zoomArea.classList.remove("oculto");
+    atualizarTextoZoomScanner(atual);
+  } else {
+    zoomArea.classList.add("oculto");
+  }
+
+  flashButton.disabled = !capabilities.torch;
+  atualizarBotaoFlashScanner();
+}
+
+async function alterarZoomScanner(valor) {
+  if (!scannerTrack) return;
+
+  const capabilities = scannerTrack.getCapabilities?.() || {};
+  if (!capabilities.zoom) return;
+
+  const min = Number(capabilities.zoom.min || 1);
+  const max = Number(capabilities.zoom.max || min);
+  const zoom = Math.min(max, Math.max(min, Number(valor)));
+
+  try {
+    await scannerTrack.applyConstraints({
+      advanced: [{ zoom }]
+    });
+
+    document.getElementById("scannerZoom").value = String(zoom);
+    atualizarTextoZoomScanner(zoom);
+  } catch (erro) {
+    console.warn("Não foi possível alterar o zoom.", erro);
+  }
+}
+
+function atualizarTextoZoomScanner(valor) {
+  document.getElementById("scannerZoomValor").innerText =
+    `${Number(valor).toFixed(1)}×`;
+}
+
+async function alternarFlashScanner() {
+  if (!scannerTrack || document.getElementById("scannerFlash").disabled) return;
+
+  scannerTorchLigado = !scannerTorchLigado;
+
+  try {
+    await scannerTrack.applyConstraints({
+      advanced: [{ torch: scannerTorchLigado }]
+    });
+  } catch (erro) {
+    scannerTorchLigado = false;
+    console.warn("O flash não está disponível neste dispositivo.", erro);
+  }
+
+  atualizarBotaoFlashScanner();
+}
+
+function atualizarBotaoFlashScanner() {
+  document
+    .getElementById("scannerFlash")
+    .classList.toggle("ativo", scannerTorchLigado);
+}
+
+async function focarScanner(evento) {
+  if (!scannerTrack) return;
+
+  const capabilities = scannerTrack.getCapabilities?.() || {};
+  const advanced = [];
+
+  if (Array.isArray(capabilities.focusMode)) {
+    if (capabilities.focusMode.includes("single-shot")) {
+      advanced.push({ focusMode: "single-shot" });
+    } else if (capabilities.focusMode.includes("continuous")) {
+      advanced.push({ focusMode: "continuous" });
+    }
+  }
+
+  if (evento && capabilities.pointsOfInterest) {
+    const area = document.getElementById("scannerVideoArea");
+    const rect = area.getBoundingClientRect();
+
+    advanced.push({
+      pointsOfInterest: [{
+        x: Math.min(1, Math.max(0, (evento.clientX - rect.left) / rect.width)),
+        y: Math.min(1, Math.max(0, (evento.clientY - rect.top) / rect.height))
+      }]
+    });
+  }
+
+  if (!advanced.length) {
+    mostrarToast("Foco automático ativo.");
     return;
   }
 
-  const modal = document.getElementById('modalScanner');
-  const video = document.getElementById('videoScanner');
-  modal.classList.add('aberto');
+  try {
+    await scannerTrack.applyConstraints({ advanced });
+    mostrarToast("Foco ajustado.");
+  } catch (erro) {
+    console.warn("Foco manual não suportado.", erro);
+    mostrarToast("Foco automático ativo.");
+  }
+}
+
+function alternarScannerHorizontal() {
+  scannerHorizontalAtivo = !scannerHorizontalAtivo;
+
+  document
+    .getElementById("modalScanner")
+    .classList.toggle("modo-horizontal", scannerHorizontalAtivo);
+
+  document.querySelector("#scannerHorizontal small").innerText =
+    scannerHorizontalAtivo ? "Padrão" : "Horizontal";
+}
+
+async function abrirScanner() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    alert("Este navegador não permite acessar a câmera.");
+    return;
+  }
+
+  const modal = document.getElementById("modalScanner");
+  const video = document.getElementById("videoScanner");
+  const status = document.getElementById("scannerStatus");
+
+  modal.classList.add("aberto");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("scanner-aberto");
+
+  scannerAtivo = true;
+  scannerTorchLigado = false;
+  status.innerText = "Preparando câmera...";
 
   try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('Câmera indisponível.');
-    }
-
     scannerStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
       video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30, max: 60 }
-      },
-      audio: false
+        facingMode: { ideal: "environment" },
+        width: { ideal: 3840, min: 1280 },
+        height: { ideal: 2160, min: 720 },
+        frameRate: { ideal: 30, min: 20 },
+        advanced: [
+          { focusMode: "continuous" },
+          { exposureMode: "continuous" },
+          { whiteBalanceMode: "continuous" }
+        ]
+      }
     });
 
     await aplicarMelhoriasCameraScanner(scannerStream);
 
     video.srcObject = scannerStream;
-    video.setAttribute('playsinline', "true");
+    video.setAttribute("playsinline", "true");
     video.muted = true;
     await video.play();
 
-    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'] });
-
-    const ler = async () => {
-      if (!modal.classList.contains('aberto')) return;
-
-      try {
-        const codigos = await detector.detect(video);
-        if (codigos.length) {
-          const codigo = codigos[0].rawValue;
-          fecharScanner();
-          document.getElementById('buscaPrincipal').value = codigo;
-          paginaAtual = 1;
-          aplicarFiltros();
-          mostrarToast(`Código lido: ${codigo}`);
-          return;
-        }
-      } catch {
-        // Mantém a leitura ativa mesmo que um frame falhe.
-      }
-
-      requestAnimationFrame(ler);
-    };
-
-    ler();
-  } catch {
+    configurarControlesScanner();
+    status.innerText = "Posicione o código dentro da moldura";
+    iniciarLeituraScanner();
+  } catch (erro) {
+    console.error(erro);
     fecharScanner();
-    alert('Não foi possível acessar a câmera do dispositivo.');
+    alert("Não foi possível acessar a câmera. Verifique a permissão do navegador.");
   }
 }
 
+function iniciarLeituraScanner() {
+  pararLeitoresScanner();
+
+  if ("BarcodeDetector" in window) {
+    iniciarDetectorNativoScanner();
+    return;
+  }
+
+  iniciarLeitorZXingScanner();
+}
+
+async function iniciarDetectorNativoScanner() {
+  try {
+    const suportados = await BarcodeDetector.getSupportedFormats();
+    const preferidos = [
+      "ean_13",
+      "ean_8",
+      "upc_a",
+      "upc_e",
+      "code_128",
+      "code_39",
+      "itf"
+    ].filter(formato => suportados.includes(formato));
+
+    scannerDetector = new BarcodeDetector({
+      formats: preferidos.length ? preferidos : suportados
+    });
+
+    const video = document.getElementById("videoScanner");
+
+    const detectar = async () => {
+      if (!scannerAtivo || !scannerDetector) return;
+
+      try {
+        if (video.readyState >= 2) {
+          const codigos = await scannerDetector.detect(video);
+
+          if (codigos.length) {
+            processarCodigoScanner(codigos[0].rawValue);
+            return;
+          }
+        }
+      } catch (erro) {
+        console.debug("Falha temporária na leitura do frame.", erro);
+      }
+
+      scannerAnimationFrame = requestAnimationFrame(detectar);
+    };
+
+    detectar();
+  } catch (erro) {
+    console.warn("Detector nativo indisponível. Tentando ZXing.", erro);
+    iniciarLeitorZXingScanner();
+  }
+}
+
+async function iniciarLeitorZXingScanner() {
+  if (!window.ZXingBrowser?.BrowserMultiFormatReader) {
+    document.getElementById("scannerStatus").innerText =
+      "Leitor indisponível neste navegador";
+    return;
+  }
+
+  try {
+    scannerLeitorZXing = new ZXingBrowser.BrowserMultiFormatReader();
+
+    scannerControleZXing = await scannerLeitorZXing.decodeFromVideoElement(
+      document.getElementById("videoScanner"),
+      (resultado, erro) => {
+        if (!scannerAtivo) return;
+
+        const codigo = resultado?.getText
+          ? resultado.getText()
+          : resultado?.text;
+
+        if (codigo) {
+          processarCodigoScanner(codigo);
+        }
+
+        if (erro && erro.name !== "NotFoundException") {
+          console.debug("Leitura ZXing:", erro);
+        }
+      }
+    );
+  } catch (erro) {
+    console.error(erro);
+    document.getElementById("scannerStatus").innerText =
+      "Não foi possível iniciar o leitor";
+  }
+}
+
+function processarCodigoScanner(codigo) {
+  const valor = String(codigo || "").trim();
+  const agora = Date.now();
+
+  if (!valor) return;
+
+  if (
+    valor === ultimoCodigoScanner &&
+    agora - ultimoCodigoScannerEm < 1800
+  ) {
+    return;
+  }
+
+  ultimoCodigoScanner = valor;
+  ultimoCodigoScannerEm = agora;
+
+  if (navigator.vibrate) {
+    navigator.vibrate(80);
+  }
+
+  document.getElementById("buscaPrincipal").value = valor;
+  paginaAtual = 1;
+  aplicarFiltros();
+  mostrarToast(`Código lido: ${valor}`);
+  fecharScanner();
+}
+
+function pararLeitoresScanner() {
+  if (scannerAnimationFrame) {
+    cancelAnimationFrame(scannerAnimationFrame);
+    scannerAnimationFrame = null;
+  }
+
+  scannerDetector = null;
+
+  if (scannerControleZXing?.stop) {
+    try {
+      scannerControleZXing.stop();
+    } catch {}
+  }
+
+  scannerControleZXing = null;
+
+  if (scannerLeitorZXing?.reset) {
+    try {
+      scannerLeitorZXing.reset();
+    } catch {}
+  }
+
+  scannerLeitorZXing = null;
+}
+
 function fecharScanner() {
-  document.getElementById('modalScanner').classList.remove('aberto');
+  scannerAtivo = false;
+  pararLeitoresScanner();
+
+  if (scannerTrack && scannerTorchLigado) {
+    scannerTrack
+      .applyConstraints({ advanced: [{ torch: false }] })
+      .catch(() => {});
+  }
 
   if (scannerStream) {
     scannerStream.getTracks().forEach(track => track.stop());
-    scannerStream = null;
   }
+
+  scannerStream = null;
+  scannerTrack = null;
+  scannerTorchLigado = false;
+
+  const video = document.getElementById("videoScanner");
+  video.pause();
+  video.srcObject = null;
+
+  const modal = document.getElementById("modalScanner");
+  modal.classList.remove("aberto");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("scanner-aberto");
 }
 
 document.getElementById("buscaPrincipal").addEventListener("input", aplicarFiltros);
@@ -1411,6 +1735,25 @@ document.getElementById("btnScanner").addEventListener("click", () => {
   fecharMenu();
 });
 document.getElementById("fecharScanner").addEventListener("click", fecharScanner);
+document.getElementById("scannerFlash").addEventListener("click", alternarFlashScanner);
+document.getElementById("scannerFoco").addEventListener("click", () => focarScanner());
+document.getElementById("scannerHorizontal").addEventListener("click", alternarScannerHorizontal);
+document.getElementById("alternarScannerHorizontal").addEventListener("click", alternarScannerHorizontal);
+document.getElementById("scannerVideoArea").addEventListener("click", focarScanner);
+
+document.getElementById("scannerZoom").addEventListener("input", event => {
+  alterarZoomScanner(event.target.value);
+});
+
+document.getElementById("scannerZoomMenos").addEventListener("click", () => {
+  const input = document.getElementById("scannerZoom");
+  alterarZoomScanner(Number(input.value) - Number(input.step || 0.1));
+});
+
+document.getElementById("scannerZoomMais").addEventListener("click", () => {
+  const input = document.getElementById("scannerZoom");
+  alterarZoomScanner(Number(input.value) + Number(input.step || 0.1));
+});
 
 document.addEventListener("click", function(event) {
   const menu = document.getElementById("menuLateral");
@@ -1423,6 +1766,19 @@ document.addEventListener("click", function(event) {
 
   if (!campoFornecedor.contains(event.target)) {
     document.getElementById("sugestoesFornecedor").classList.remove("ativo");
+  }
+});
+
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && scannerAtivo) {
+    fecharScanner();
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  if (scannerAtivo) {
+    fecharScanner();
   }
 });
 
