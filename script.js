@@ -1304,12 +1304,9 @@ function obterRotuloCategoriaAtual() {
   return categoriaAtual === "todos" ? "Todas as Categorias" : categoriaAtual;
 }
 
-function carregarImagemProdutoParaPdf(caminho) {
+function carregarImagemProdutoParaPdf(caminho, fundoBranco = true) {
   return new Promise(resolve => {
-    if (!caminho) {
-      resolve(null);
-      return;
-    }
+    if (!caminho) return resolve(null);
 
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -1317,28 +1314,28 @@ function carregarImagemProdutoParaPdf(caminho) {
     img.onload = () => {
       try {
         const canvas = document.createElement("canvas");
-        const limite = 360;
-        const larguraOriginal = img.naturalWidth || img.width;
-        const alturaOriginal = img.naturalHeight || img.height;
-        const escala = Math.min(
-          1,
-          limite / Math.max(larguraOriginal, alturaOriginal)
-        );
+        const limite = 420;
+        const w0 = img.naturalWidth || img.width;
+        const h0 = img.naturalHeight || img.height;
+        const escala = Math.min(1, limite / Math.max(w0, h0));
 
-        canvas.width = Math.max(1, Math.round(larguraOriginal * escala));
-        canvas.height = Math.max(1, Math.round(alturaOriginal * escala));
+        canvas.width = Math.max(1, Math.round(w0 * escala));
+        canvas.height = Math.max(1, Math.round(h0 * escala));
 
         const ctx = canvas.getContext("2d");
-
-        // Fundo branco para preservar embalagens transparentes.
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (fundoBranco) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
         resolve({
-          dataUrl: canvas.toDataURL("image/jpeg", 0.86),
+          dataUrl: canvas.toDataURL(fundoBranco ? "image/jpeg" : "image/png", fundoBranco ? 0.88 : 1),
           largura: canvas.width,
-          altura: canvas.height
+          altura: canvas.height,
+          formato: fundoBranco ? "JPEG" : "PNG"
         });
       } catch (erro) {
         console.warn("Falha ao preparar imagem para PDF.", erro);
@@ -1351,35 +1348,69 @@ function carregarImagemProdutoParaPdf(caminho) {
   });
 }
 
-function desenharCabecalhoPremiumPdf(doc, categoria) {
+async function carregarLogoCatalogoParaPdf() {
+  const logoTela = document.getElementById("logoCatalogo");
+  const caminho = logoTela?.getAttribute("src") || "Logos/Eldorado.png";
+  return carregarImagemProdutoParaPdf(caminho, false);
+}
+
+function desenharCabecalhoPremiumPdf(doc, categoria, logoPdf) {
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Fundo institucional.
   doc.setFillColor(0, 103, 56);
-  doc.rect(0, 0, pageWidth, 34, "F");
+  doc.rect(0, 0, pageWidth, 31, "F");
 
-  // Faixa de destaque inferior.
   doc.setFillColor(255, 107, 26);
-  doc.rect(0, 31, pageWidth, 3, "F");
+  doc.rect(0, 28.5, pageWidth, 2.5, "F");
 
-  // Elemento decorativo discreto.
-  doc.setFillColor(17, 130, 71);
-  doc.circle(pageWidth - 14, 10, 22, "F");
-  doc.setFillColor(31, 148, 83);
-  doc.circle(pageWidth - 3, 25, 18, "F");
+  // Mesma logo usada no cabeçalho do catálogo.
+  if (logoPdf?.dataUrl) {
+    const boxX = 10;
+    const boxY = 5;
+    const boxW = 35;
+    const boxH = 19;
+
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(boxX, boxY, boxW, boxH, 2.3, 2.3, "F");
+
+    const escala = Math.min(
+      (boxW - 4) / logoPdf.largura,
+      (boxH - 3) / logoPdf.altura
+    );
+    const w = logoPdf.largura * escala;
+    const h = logoPdf.altura * escala;
+
+    doc.addImage(
+      logoPdf.dataUrl,
+      logoPdf.formato || "PNG",
+      boxX + (boxW - w) / 2,
+      boxY + (boxH - h) / 2,
+      w,
+      h,
+      undefined,
+      "FAST"
+    );
+  }
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(19);
-  doc.text("CATÁLOGO ELDORADO", 14, 15);
+  doc.setFontSize(16.5);
+  doc.text("CATÁLOGO ELDORADO", 51, 12);
 
-  doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text("Relação de Produtos", 14, 22);
-
   doc.setFontSize(8.5);
-  doc.setTextColor(230, 244, 235);
-  doc.text(`Categoria: ${categoria}`, 14, 28);
+  doc.setTextColor(225, 241, 231);
+  doc.text("Relação de produtos selecionados", 51, 18);
+
+  // Categoria em destaque forte.
+  const categoriaTexto = String(categoria || "Todas as Categorias").toUpperCase();
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(51, 21, 82, 6.2, 2.5, 2.5, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.2);
+  doc.setTextColor(0, 103, 56);
+  doc.text(categoriaTexto, 92, 25.3, { align: "center", maxWidth: 77 });
 
   doc.setTextColor(0, 0, 0);
 }
@@ -1388,24 +1419,23 @@ function desenharRodapePremiumPdf(doc) {
   const altura = doc.internal.pageSize.getHeight();
   const largura = doc.internal.pageSize.getWidth();
 
-  doc.setDrawColor(220, 227, 222);
-  doc.line(10, altura - 12, largura - 10, altura - 12);
+  doc.setDrawColor(225, 230, 227);
+  doc.line(8, altura - 9, largura - 8, altura - 9);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.8);
-  doc.setTextColor(95, 105, 100);
-
+  doc.setFontSize(6.2);
+  doc.setTextColor(100, 108, 104);
   doc.text(
-    "Catálogo ilustrativo. Consulte disponibilidade, preços e condições comerciais com o RCA.",
-    10,
-    altura - 7
+    "Catálogo ilustrativo • Consulte disponibilidade, preços e condições comerciais com o RCA.",
+    8,
+    altura - 5
   );
 
   doc.setFont("helvetica", "bold");
   doc.text(
     `Página ${doc.internal.getNumberOfPages()}`,
-    largura - 10,
-    altura - 7,
+    largura - 8,
+    altura - 5,
     { align: "right" }
   );
 
@@ -1427,67 +1457,56 @@ async function gerarPdfProdutosFiltrados() {
   const doc = new jsPDF("p", "mm", "a4");
 
   const dataAtual = new Date().toLocaleDateString("pt-BR");
-  const buscaPrincipal =
-    document.getElementById("buscaPrincipal")?.value.trim() || "";
-  const codigoFornecedor =
-    document.getElementById("buscaCodigoFornecedor")?.value.trim() || "";
-
+  const buscaPrincipal = document.getElementById("buscaPrincipal")?.value.trim() || "";
+  const codigoFornecedor = document.getElementById("buscaCodigoFornecedor")?.value.trim() || "";
   const filtroEstoque = document.getElementById("filtroEstoque");
-  const ordenacao = document.getElementById("ordenacao");
-
-  const rotuloEstoque =
-    filtroEstoque?.options[filtroEstoque.selectedIndex]?.text || "";
-
-  const rotuloOrdenacao =
-    ordenacao?.options[ordenacao.selectedIndex]?.text || "";
-
+  const rotuloEstoque = filtroEstoque?.options[filtroEstoque.selectedIndex]?.text || "";
   const categoria = obterRotuloCategoriaAtual();
 
-  mostrarToast("Preparando PDF com imagens...");
+  mostrarToast("Preparando imagens e logo para o PDF...");
 
-  const imagensPdf = await Promise.all(
-    produtosFiltrados.map(produto =>
-      carregarImagemProdutoParaPdf(
-        produto.imagem ? `Imagens/${produto.imagem}` : ""
+  const [logoPdf, imagensPdf] = await Promise.all([
+    carregarLogoCatalogoParaPdf(),
+    Promise.all(
+      produtosFiltrados.map(produto =>
+        carregarImagemProdutoParaPdf(
+          produto.imagem ? `Imagens/${produto.imagem}` : "",
+          true
+        )
       )
     )
-  );
+  ]);
 
-  desenharCabecalhoPremiumPdf(doc, categoria);
+  desenharCabecalhoPremiumPdf(doc, categoria, logoPdf);
 
-  // Área de resumo dos filtros.
-  let y = 42;
-
-  doc.setFillColor(246, 249, 247);
-  doc.setDrawColor(221, 229, 223);
-  doc.roundedRect(10, y, 190, 24, 3, 3, "FD");
+  // Resumo compacto para liberar mais espaço aos produtos.
+  let y = 35;
+  doc.setFillColor(247, 249, 248);
+  doc.setDrawColor(225, 230, 227);
+  doc.roundedRect(8, y, 194, 12, 2, 2, "FD");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(7.2);
   doc.setTextColor(0, 103, 56);
-  doc.text("DETALHES DA CONSULTA", 14, y + 6);
+  doc.text(`${produtosFiltrados.length} PRODUTOS`, 12, y + 5);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.8);
-  doc.setTextColor(55, 65, 60);
+  doc.setTextColor(70, 78, 74);
+  doc.text(`Atualizado em ${dataAtual}`, 44, y + 5);
+  doc.text(`Estoque: ${rotuloEstoque}`, 82, y + 5, { maxWidth: 50 });
 
-  let linha1 = `Data: ${dataAtual}   |   Estoque: ${rotuloEstoque}`;
-  let linha2 = `Ordenação: ${rotuloOrdenacao}`;
-  let linha3 = `Total de produtos: ${produtosFiltrados.length}`;
-
+  let segundaLinha = "";
+  if (buscaPrincipal) segundaLinha += `Busca: ${buscaPrincipal}`;
   if (codigoFornecedor) {
-    linha2 += `   |   Código Fornecedor: ${codigoFornecedor}`;
+    segundaLinha += `${segundaLinha ? "  •  " : ""}Cód. Fornecedor: ${codigoFornecedor}`;
   }
 
-  if (buscaPrincipal) {
-    linha3 += `   |   Busca: ${buscaPrincipal}`;
+  if (segundaLinha) {
+    doc.setFontSize(6.6);
+    doc.text(segundaLinha, 12, y + 9.3, { maxWidth: 184 });
   }
 
-  doc.text(linha1, 14, y + 12, { maxWidth: 182 });
-  doc.text(linha2, 14, y + 17, { maxWidth: 182 });
-  doc.text(linha3, 14, y + 22, { maxWidth: 182 });
-
-  y += 30;
+  y += 15;
 
   const linhas = produtosFiltrados.map(produto => [
     "",
@@ -1500,26 +1519,19 @@ async function gerarPdfProdutosFiltrados() {
 
   doc.autoTable({
     startY: y,
-    head: [[
-      "Produto",
-      "Código",
-      "Descrição",
-      "EAN",
-      "Embalagem",
-      "QTD Master"
-    ]],
+    head: [["PRODUTO", "CÓD.", "DESCRIÇÃO", "EAN", "EMBALAGEM", "MASTER"]],
     body: linhas,
-    theme: "plain",
+    theme: "grid",
 
     styles: {
-      fontSize: 7,
-      cellPadding: 2,
+      fontSize: 6.25,
+      cellPadding: 1.15,
       overflow: "linebreak",
       valign: "middle",
-      textColor: [42, 48, 45],
-      minCellHeight: 23,
-      lineColor: [225, 230, 227],
-      lineWidth: 0.2
+      textColor: [45, 51, 48],
+      minCellHeight: 17.2,
+      lineColor: [226, 231, 228],
+      lineWidth: 0.16
     },
 
     headStyles: {
@@ -1527,139 +1539,84 @@ async function gerarPdfProdutosFiltrados() {
       textColor: [255, 255, 255],
       fontStyle: "bold",
       halign: "center",
-      valign: "middle",
-      minCellHeight: 9,
-      lineWidth: 0
+      minCellHeight: 7.2,
+      fontSize: 6.4
     },
 
     alternateRowStyles: {
-      fillColor: [247, 250, 248]
+      fillColor: [248, 250, 249]
     },
 
     columnStyles: {
-      0: {
-        cellWidth: 27,
-        halign: "center",
-        fillColor: [252, 252, 252]
-      },
-      1: {
-        cellWidth: 18,
-        fontStyle: "bold",
-        textColor: [0, 103, 56]
-      },
-      2: {
-        cellWidth: 65,
-        fontStyle: "bold"
-      },
-      3: {
-        cellWidth: 31
-      },
-      4: {
-        cellWidth: 24,
-        halign: "center"
-      },
-      5: {
-        cellWidth: 20,
-        halign: "center",
-        fontStyle: "bold"
-      }
+      // Imagem maior, mas linha mais compacta: reconhecimento melhor sem desperdiçar altura.
+      0: { cellWidth: 31, halign: "center", cellPadding: 0.7 },
+      1: { cellWidth: 16, fontStyle: "bold", textColor: [0, 103, 56] },
+      2: { cellWidth: 65, fontStyle: "bold", fontSize: 6.5 },
+      3: { cellWidth: 30, fontSize: 5.9 },
+      4: { cellWidth: 24, halign: "center" },
+      5: { cellWidth: 18, halign: "center", fontStyle: "bold" }
     },
 
     margin: {
-      left: 10,
-      right: 10,
-      top: 40,
-      bottom: 16
-    },
-
-    willDrawCell: data => {
-      if (data.section === "body") {
-        // Card interno discreto para cada linha.
-        doc.setFillColor(
-          data.row.index % 2 === 0 ? 255 : 247,
-          data.row.index % 2 === 0 ? 255 : 250,
-          data.row.index % 2 === 0 ? 255 : 248
-        );
-
-        doc.roundedRect(
-          data.cell.x + 0.3,
-          data.cell.y + 0.4,
-          data.cell.width - 0.6,
-          data.cell.height - 0.8,
-          1.2,
-          1.2,
-          "F"
-        );
-      }
+      left: 8,
+      right: 8,
+      top: 34,
+      bottom: 12
     },
 
     didDrawCell: data => {
-      if (data.section !== "body" || data.column.index !== 0) {
-        return;
-      }
+      if (data.section !== "body" || data.column.index !== 0) return;
 
       const imagem = imagensPdf[data.row.index];
 
-      if (!imagem) {
-        doc.setFillColor(243, 246, 244);
-        doc.roundedRect(
-          data.cell.x + 2,
-          data.cell.y + 2,
-          data.cell.width - 4,
-          data.cell.height - 4,
-          2,
-          2,
-          "F"
-        );
+      // Fundo de exposição mais limpo e contrastante.
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(218, 225, 221);
+      doc.roundedRect(
+        data.cell.x + 0.7,
+        data.cell.y + 0.7,
+        data.cell.width - 1.4,
+        data.cell.height - 1.4,
+        1.5,
+        1.5,
+        "FD"
+      );
 
-        doc.setTextColor(145, 150, 147);
-        doc.setFontSize(6);
+      if (!imagem) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(5.5);
+        doc.setTextColor(150, 155, 152);
         doc.text(
           "Sem imagem",
           data.cell.x + data.cell.width / 2,
           data.cell.y + data.cell.height / 2 + 1,
           { align: "center" }
         );
-
         doc.setTextColor(0, 0, 0);
         return;
       }
 
-      // Fundo da imagem.
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(225, 230, 227);
-      doc.roundedRect(
-        data.cell.x + 1.5,
-        data.cell.y + 1.5,
-        data.cell.width - 3,
-        data.cell.height - 3,
-        2,
-        2,
-        "FD"
-      );
-
-      const larguraMax = data.cell.width - 5;
-      const alturaMax = data.cell.height - 5;
-
+      // Ocupa quase toda a célula para facilitar identificação.
+      const larguraMax = data.cell.width - 2.2;
+      const alturaMax = data.cell.height - 2.0;
       const escala = Math.min(
         larguraMax / imagem.largura,
         alturaMax / imagem.altura
       );
 
-      const largura = imagem.largura * escala;
-      const altura = imagem.altura * escala;
-
-      const x = data.cell.x + (data.cell.width - largura) / 2;
-      const yImagem = data.cell.y + (data.cell.height - altura) / 2;
+      const w = imagem.largura * escala;
+      const h = imagem.altura * escala;
+      const x = data.cell.x + (data.cell.width - w) / 2;
+      const yy = data.cell.y + (data.cell.height - h) / 2;
 
       try {
         doc.addImage(
           imagem.dataUrl,
-          "JPEG",
+          imagem.formato || "JPEG",
           x,
-          yImagem,
-          largura,
-          altura,
+          yy,
+          w,
+          h,
           undefined,
           "FAST"
         );
@@ -1670,9 +1627,8 @@ async function gerarPdfProdutosFiltrados() {
 
     didDrawPage: data => {
       if (data.pageNumber > 1) {
-        desenharCabecalhoPremiumPdf(doc, categoria);
+        desenharCabecalhoPremiumPdf(doc, categoria, logoPdf);
       }
-
       desenharRodapePremiumPdf(doc);
     }
   });
@@ -1682,11 +1638,8 @@ async function gerarPdfProdutosFiltrados() {
     .replace(/^_+|_+$/g, "")
     .toUpperCase();
 
-  doc.save(
-    `CATALOGO_ELDORADO_${nomeCategoria || "PRODUTOS"}.pdf`
-  );
-
-  mostrarToast("PDF gerado com imagens e novo visual.");
+  doc.save(`CATALOGO_ELDORADO_${nomeCategoria || "PRODUTOS"}.pdf`);
+  mostrarToast("PDF gerado com logo, categoria destacada e imagens ampliadas.");
 }
 
 
