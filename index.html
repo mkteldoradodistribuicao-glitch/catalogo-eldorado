@@ -12,7 +12,7 @@
 <body class="tema-eldorado">
   <header class="topo">
     <div class="topo-conteudo">
-      <img id="logoCatalogo" src="Logos/Eldorado.png" alt="Logo do catálogo" class="logo" />
+      <button id="btnLogoCatalogo" class="logo-link" type="button" aria-label="Voltar ao Catálogo Eldorado"><img id="logoCatalogo" src="Logos/Eldorado.png" alt="Logo do catálogo" class="logo" /></button>
 
       <div class="titulo-area">
         <h1 id="tituloCatalogo">Catálogo Eldorado</h1>
@@ -190,5 +190,62 @@
       window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
     }
   </script>
+
+  <footer class="rodape-catalogo">
+    <div class="rodape-conteudo">
+      <div class="rodape-marca">
+        <img src="Logos/Eldorado.png" alt="Eldorado Distribuição" class="rodape-logo" />
+        <div>
+          <strong>Catálogo Digital Eldorado</strong>
+          <span>Eldorado Distribuição</span>
+        </div>
+      </div>
+
+      <div class="rodape-links">
+        <button type="button" data-rodape-modo="eldorado">Catálogo</button>
+        <button type="button" data-rodape-modo="novidades">Novidades</button>
+        <button type="button" data-rodape-modo="favoritos">Favoritos</button>
+        <button type="button" data-rodape-modo="ternura">Produtos Ternura</button>
+      </div>
+
+      <div class="rodape-contatos">
+        <a class="rodape-instagram"
+           href="https://www.instagram.com/eldoradodistribuicao/"
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="Abrir Instagram da Eldorado Distribuição">
+          <span class="instagram-icone" aria-hidden="true">◎</span>
+          <span>
+            <small>Instagram</small>
+            <strong>@eldoradodistribuicao</strong>
+          </span>
+        </a>
+
+        <a class="rodape-whatsapp"
+           href="https://wa.me/556233103400?text=Ol%C3%A1%21%20Acessei%20o%20Cat%C3%A1logo%20Eldorado%20e%20tenho%20interesse%20em%20comprar%20com%20voc%C3%AAs.%20Gostaria%20de%20mais%20informa%C3%A7%C3%B5es."
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="Falar com a Eldorado Distribuição pelo WhatsApp">
+          <span class="whatsapp-icone" aria-hidden="true">✆</span>
+          <span class="whatsapp-texto">
+            <small>Quer comprar conosco?</small>
+            <strong>(62) 3310-3400</strong>
+            <em>Fale com nossa equipe comercial</em>
+          </span>
+        </a>
+      </div>
+    </div>
+
+    <div class="rodape-aviso">
+      Imagens ilustrativas. Consulte disponibilidade, preços e condições comerciais com seu RCA.
+    </div>
+
+    <div class="rodape-final">
+      <span>© 2026 Eldorado Distribuição</span>
+      <span id="rodapeTotalProdutos">Catálogo digital</span>
+      <button id="rodapeVoltarTopo" type="button">↑ Voltar ao topo</button>
+    </div>
+  </footer>
+
 </body>
 </html>

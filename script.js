@@ -1431,6 +1431,50 @@ function gerarPdfProdutosFiltrados() {
   mostrarToast("PDF gerado com os produtos filtrados.");
 }
 
+
+function voltarParaCatalogoPrincipal(){
+  if(modoAtual!=="eldorado"){trocarModo("eldorado");}else{limparFiltros();}
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function configurarAnimacaoCabecalho(){
+  const topo=document.querySelector(".topo");
+  if(!topo)return;
+  topo.addEventListener("pointermove",e=>{
+    const r=topo.getBoundingClientRect();
+    topo.style.setProperty("--topo-x",`${((e.clientX-r.left)/r.width)*100}%`);
+    topo.style.setProperty("--topo-y",`${((e.clientY-r.top)/r.height)*100}%`);
+  });
+  topo.addEventListener("pointerleave",()=>{
+    topo.style.setProperty("--topo-x","24%");
+    topo.style.setProperty("--topo-y","34%");
+  });
+}
+
+
+function configurarRodapeCatalogo() {
+  document.querySelectorAll("[data-rodape-modo]").forEach(botao => {
+    botao.addEventListener("click", () => {
+      const modo = botao.dataset.rodapeModo;
+      trocarModo(modo);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+
+  document.getElementById("rodapeVoltarTopo")?.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
+
+function atualizarInformacoesRodape() {
+  const total = document.getElementById("rodapeTotalProdutos");
+  if (!total) return;
+
+  const quantidade = Array.isArray(produtos) ? produtos.length : 0;
+  total.textContent = quantidade
+    ? `${quantidade.toLocaleString("pt-BR")} produtos no catálogo`
+    : "Catálogo digital";
+}
+
 document.getElementById("buscaPrincipal").addEventListener("input", aplicarFiltros);
 document.getElementById("buscaCodigoFornecedor").addEventListener("input", aplicarFiltros);
 
@@ -1451,6 +1495,7 @@ document.getElementById("filtroEstoque").addEventListener("change", () => {
 
 document.getElementById("btnGerarPdfProdutos").addEventListener("click", gerarPdfProdutosFiltrados);
 document.getElementById("btnPdfFlutuante").addEventListener("click", gerarPdfProdutosFiltrados);
+document.getElementById("btnLogoCatalogo").addEventListener("click", voltarParaCatalogoPrincipal);
 document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
 
 document.getElementById("btnMenu").addEventListener("click", function(event) {
@@ -1561,6 +1606,8 @@ window.addEventListener("resize", () => {
 });
 
 document.getElementById("ordenacao").value = "maior-estoque";
+configurarAnimacaoCabecalho();
+configurarRodapeCatalogo();
 configurarAnimacaoCategorias();
 atualizarCategoriasAtivas();
 carregarProdutos();
