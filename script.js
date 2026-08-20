@@ -1304,7 +1304,115 @@ function obterRotuloCategoriaAtual() {
   return categoriaAtual === "todos" ? "Todas as Categorias" : categoriaAtual;
 }
 
-function gerarPdfProdutosFiltrados() {
+function carregarImagemProdutoParaPdf(caminho) {
+  return new Promise(resolve => {
+    if (!caminho) {
+      resolve(null);
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const limite = 360;
+        const larguraOriginal = img.naturalWidth || img.width;
+        const alturaOriginal = img.naturalHeight || img.height;
+        const escala = Math.min(
+          1,
+          limite / Math.max(larguraOriginal, alturaOriginal)
+        );
+
+        canvas.width = Math.max(1, Math.round(larguraOriginal * escala));
+        canvas.height = Math.max(1, Math.round(alturaOriginal * escala));
+
+        const ctx = canvas.getContext("2d");
+
+        // Fundo branco para preservar embalagens transparentes.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        resolve({
+          dataUrl: canvas.toDataURL("image/jpeg", 0.86),
+          largura: canvas.width,
+          altura: canvas.height
+        });
+      } catch (erro) {
+        console.warn("Falha ao preparar imagem para PDF.", erro);
+        resolve(null);
+      }
+    };
+
+    img.onerror = () => resolve(null);
+    img.src = caminho;
+  });
+}
+
+function desenharCabecalhoPremiumPdf(doc, categoria) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Fundo institucional.
+  doc.setFillColor(0, 103, 56);
+  doc.rect(0, 0, pageWidth, 34, "F");
+
+  // Faixa de destaque inferior.
+  doc.setFillColor(255, 107, 26);
+  doc.rect(0, 31, pageWidth, 3, "F");
+
+  // Elemento decorativo discreto.
+  doc.setFillColor(17, 130, 71);
+  doc.circle(pageWidth - 14, 10, 22, "F");
+  doc.setFillColor(31, 148, 83);
+  doc.circle(pageWidth - 3, 25, 18, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(19);
+  doc.text("CATÁLOGO ELDORADO", 14, 15);
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text("Relação de Produtos", 14, 22);
+
+  doc.setFontSize(8.5);
+  doc.setTextColor(230, 244, 235);
+  doc.text(`Categoria: ${categoria}`, 14, 28);
+
+  doc.setTextColor(0, 0, 0);
+}
+
+function desenharRodapePremiumPdf(doc) {
+  const altura = doc.internal.pageSize.getHeight();
+  const largura = doc.internal.pageSize.getWidth();
+
+  doc.setDrawColor(220, 227, 222);
+  doc.line(10, altura - 12, largura - 10, altura - 12);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.8);
+  doc.setTextColor(95, 105, 100);
+
+  doc.text(
+    "Catálogo ilustrativo. Consulte disponibilidade, preços e condições comerciais com o RCA.",
+    10,
+    altura - 7
+  );
+
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    `Página ${doc.internal.getNumberOfPages()}`,
+    largura - 10,
+    altura - 7,
+    { align: "right" }
+  );
+
+  doc.setTextColor(0, 0, 0);
+}
+
+async function gerarPdfProdutosFiltrados() {
   if (!produtosFiltrados.length) {
     alert("Nenhum produto encontrado com os filtros atuais.");
     return;
@@ -1319,106 +1427,253 @@ function gerarPdfProdutosFiltrados() {
   const doc = new jsPDF("p", "mm", "a4");
 
   const dataAtual = new Date().toLocaleDateString("pt-BR");
-  const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
-  const codigoFornecedor = document.getElementById("buscaCodigoFornecedor").value.trim();
-  const fornecedor = document.getElementById("buscaFornecedor").value.trim();
+  const buscaPrincipal =
+    document.getElementById("buscaPrincipal")?.value.trim() || "";
+  const codigoFornecedor =
+    document.getElementById("buscaCodigoFornecedor")?.value.trim() || "";
+
   const filtroEstoque = document.getElementById("filtroEstoque");
-  const rotuloEstoque = filtroEstoque.options[filtroEstoque.selectedIndex]?.text || "";
+  const ordenacao = document.getElementById("ordenacao");
+
+  const rotuloEstoque =
+    filtroEstoque?.options[filtroEstoque.selectedIndex]?.text || "";
+
+  const rotuloOrdenacao =
+    ordenacao?.options[ordenacao.selectedIndex]?.text || "";
+
   const categoria = obterRotuloCategoriaAtual();
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("CATÁLOGO ELDORADO", 14, 18);
+  mostrarToast("Preparando PDF com imagens...");
 
-  doc.setFontSize(13);
-  doc.text("Produtos filtrados", 14, 26);
+  const imagensPdf = await Promise.all(
+    produtosFiltrados.map(produto =>
+      carregarImagemProdutoParaPdf(
+        produto.imagem ? `Imagens/${produto.imagem}` : ""
+      )
+    )
+  );
+
+  desenharCabecalhoPremiumPdf(doc, categoria);
+
+  // Área de resumo dos filtros.
+  let y = 42;
+
+  doc.setFillColor(246, 249, 247);
+  doc.setDrawColor(221, 229, 223);
+  doc.roundedRect(10, y, 190, 24, 3, 3, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(0, 103, 56);
+  doc.text("DETALHES DA CONSULTA", 14, y + 6);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(7.8);
+  doc.setTextColor(55, 65, 60);
 
-  let y = 34;
-
-  doc.text(`Data: ${dataAtual}`, 14, y);
-  y += 5;
-
-  doc.text(`Categoria: ${categoria}`, 14, y);
-  y += 5;
-
-  if (buscaPrincipal) {
-    doc.text(`Busca: ${buscaPrincipal}`, 14, y, { maxWidth: 180 });
-    y += 5;
-  }
+  let linha1 = `Data: ${dataAtual}   |   Estoque: ${rotuloEstoque}`;
+  let linha2 = `Ordenação: ${rotuloOrdenacao}`;
+  let linha3 = `Total de produtos: ${produtosFiltrados.length}`;
 
   if (codigoFornecedor) {
-    doc.text(`Código Fornecedor: ${codigoFornecedor}`, 14, y);
-    y += 5;
+    linha2 += `   |   Código Fornecedor: ${codigoFornecedor}`;
   }
 
-  if (fornecedor) {
-    doc.text(`Fornecedor: ${fornecedor}`, 14, y, { maxWidth: 180 });
-    y += 5;
+  if (buscaPrincipal) {
+    linha3 += `   |   Busca: ${buscaPrincipal}`;
   }
 
-  doc.text(`Estoque: ${rotuloEstoque}`, 14, y, { maxWidth: 180 });
-  y += 5;
+  doc.text(linha1, 14, y + 12, { maxWidth: 182 });
+  doc.text(linha2, 14, y + 17, { maxWidth: 182 });
+  doc.text(linha3, 14, y + 22, { maxWidth: 182 });
 
-  doc.text(`Total de produtos: ${produtosFiltrados.length}`, 14, y);
-  y += 7;
+  y += 30;
 
   const linhas = produtosFiltrados.map(produto => [
+    "",
     produto.codigo || "",
     produto.descricao || "",
     produto.ean || "",
     produto.embalagem || "",
-    produto.qtdMaster || "",
-    produto.fornecedor || ""
+    produto.qtdMaster || ""
   ]);
 
   doc.autoTable({
     startY: y,
     head: [[
+      "Produto",
       "Código",
       "Descrição",
       "EAN",
       "Embalagem",
-      "QTD Master",
-      "Fornecedor"
+      "QTD Master"
     ]],
     body: linhas,
+    theme: "plain",
+
     styles: {
       fontSize: 7,
-      cellPadding: 1.6,
+      cellPadding: 2,
       overflow: "linebreak",
-      valign: "middle"
+      valign: "middle",
+      textColor: [42, 48, 45],
+      minCellHeight: 23,
+      lineColor: [225, 230, 227],
+      lineWidth: 0.2
     },
+
     headStyles: {
-      fillColor: [0, 150, 57],
+      fillColor: [0, 103, 56],
       textColor: [255, 255, 255],
-      fontStyle: "bold"
+      fontStyle: "bold",
+      halign: "center",
+      valign: "middle",
+      minCellHeight: 9,
+      lineWidth: 0
     },
+
+    alternateRowStyles: {
+      fillColor: [247, 250, 248]
+    },
+
     columnStyles: {
-      0: { cellWidth: 18 },
-      1: { cellWidth: 62 },
-      2: { cellWidth: 31 },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 18, halign: "center" },
-      5: { cellWidth: 35 }
+      0: {
+        cellWidth: 27,
+        halign: "center",
+        fillColor: [252, 252, 252]
+      },
+      1: {
+        cellWidth: 18,
+        fontStyle: "bold",
+        textColor: [0, 103, 56]
+      },
+      2: {
+        cellWidth: 65,
+        fontStyle: "bold"
+      },
+      3: {
+        cellWidth: 31
+      },
+      4: {
+        cellWidth: 24,
+        halign: "center"
+      },
+      5: {
+        cellWidth: 20,
+        halign: "center",
+        fontStyle: "bold"
+      }
     },
+
     margin: {
       left: 10,
       right: 10,
-      bottom: 14
+      top: 40,
+      bottom: 16
     },
-    didDrawPage: () => {
-      const pageHeight = doc.internal.pageSize.height;
-      doc.setFontSize(7);
-      doc.setTextColor(90);
-      doc.text(
-        "Catálogo ilustrativo. Consulte disponibilidade, preço e condições comerciais com o RCA.",
-        10,
-        pageHeight - 7
+
+    willDrawCell: data => {
+      if (data.section === "body") {
+        // Card interno discreto para cada linha.
+        doc.setFillColor(
+          data.row.index % 2 === 0 ? 255 : 247,
+          data.row.index % 2 === 0 ? 255 : 250,
+          data.row.index % 2 === 0 ? 255 : 248
+        );
+
+        doc.roundedRect(
+          data.cell.x + 0.3,
+          data.cell.y + 0.4,
+          data.cell.width - 0.6,
+          data.cell.height - 0.8,
+          1.2,
+          1.2,
+          "F"
+        );
+      }
+    },
+
+    didDrawCell: data => {
+      if (data.section !== "body" || data.column.index !== 0) {
+        return;
+      }
+
+      const imagem = imagensPdf[data.row.index];
+
+      if (!imagem) {
+        doc.setFillColor(243, 246, 244);
+        doc.roundedRect(
+          data.cell.x + 2,
+          data.cell.y + 2,
+          data.cell.width - 4,
+          data.cell.height - 4,
+          2,
+          2,
+          "F"
+        );
+
+        doc.setTextColor(145, 150, 147);
+        doc.setFontSize(6);
+        doc.text(
+          "Sem imagem",
+          data.cell.x + data.cell.width / 2,
+          data.cell.y + data.cell.height / 2 + 1,
+          { align: "center" }
+        );
+
+        doc.setTextColor(0, 0, 0);
+        return;
+      }
+
+      // Fundo da imagem.
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(225, 230, 227);
+      doc.roundedRect(
+        data.cell.x + 1.5,
+        data.cell.y + 1.5,
+        data.cell.width - 3,
+        data.cell.height - 3,
+        2,
+        2,
+        "FD"
       );
-      doc.setTextColor(0);
+
+      const larguraMax = data.cell.width - 5;
+      const alturaMax = data.cell.height - 5;
+
+      const escala = Math.min(
+        larguraMax / imagem.largura,
+        alturaMax / imagem.altura
+      );
+
+      const largura = imagem.largura * escala;
+      const altura = imagem.altura * escala;
+
+      const x = data.cell.x + (data.cell.width - largura) / 2;
+      const yImagem = data.cell.y + (data.cell.height - altura) / 2;
+
+      try {
+        doc.addImage(
+          imagem.dataUrl,
+          "JPEG",
+          x,
+          yImagem,
+          largura,
+          altura,
+          undefined,
+          "FAST"
+        );
+      } catch (erro) {
+        console.warn("Falha ao inserir imagem no PDF.", erro);
+      }
+    },
+
+    didDrawPage: data => {
+      if (data.pageNumber > 1) {
+        desenharCabecalhoPremiumPdf(doc, categoria);
+      }
+
+      desenharRodapePremiumPdf(doc);
     }
   });
 
@@ -1427,8 +1682,11 @@ function gerarPdfProdutosFiltrados() {
     .replace(/^_+|_+$/g, "")
     .toUpperCase();
 
-  doc.save(`CATALOGO_ELDORADO_${nomeCategoria || "PRODUTOS"}.pdf`);
-  mostrarToast("PDF gerado com os produtos filtrados.");
+  doc.save(
+    `CATALOGO_ELDORADO_${nomeCategoria || "PRODUTOS"}.pdf`
+  );
+
+  mostrarToast("PDF gerado com imagens e novo visual.");
 }
 
 
