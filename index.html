@@ -21,21 +21,58 @@
           Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização.
         </div>
       </div>
-
-      <button id="btnCotacao" class="cotacao-btn" type="button" aria-label="Abrir cotação">
-        <span class="icone-carrinho">🛒</span>
-        <span id="contadorCotacao">0</span>
+<button id="btnGerarPdfProdutos" class="pdf-btn" type="button"
+        aria-label="Gerar PDF dos produtos filtrados" title="Gerar PDF">
+        <span>PDF</span>
       </button>
-
       <button id="btnMenu" class="menu-btn" type="button" aria-label="Abrir menu">☰</button>
     </div>
+
+
+    <nav id="categoriasNav" class="categorias-nav" aria-label="Categorias de produtos">
+      <div class="categorias-conteudo">
+        <button class="categoria-btn" type="button" data-categoria="Mercearia">
+          <span class="categoria-icone">🛒</span>
+          <span>Mercearia</span>
+        </button>
+
+        <button class="categoria-btn" type="button" data-categoria="Bebidas">
+          <span class="categoria-icone">🥤</span>
+          <span>Bebidas</span>
+        </button>
+
+        <button class="categoria-btn" type="button" data-categoria="Higiene Pessoal">
+          <span class="categoria-icone">🧴</span>
+          <span>Higiene Pessoal</span>
+        </button>
+
+        <button class="categoria-btn" type="button" data-categoria="Limpeza">
+          <span class="categoria-icone">🧼</span>
+          <span>Limpeza</span>
+        </button>
+
+        <button class="categoria-btn" type="button" data-categoria="Bazar">
+          <span class="categoria-icone">🍳</span>
+          <span>Bazar</span>
+        </button>
+
+        <button class="categoria-btn" type="button" data-categoria="Papelaria">
+          <span class="categoria-icone">✏️</span>
+          <span>Papelaria</span>
+        </button>
+
+        <button class="categoria-btn" type="button" data-categoria="Demais">
+          <span class="categoria-icone">▦</span>
+          <span>Demais</span>
+        </button>
+      </div>
+    </nav>
 
     <nav id="menuLateral" class="menu-lateral">
       <button id="btnCatalogoEldorado" type="button">Catálogo Eldorado</button>
       <button id="btnProdutosTernura" type="button">Produtos Ternura</button>
       <button id="btnNovidades" type="button">Novidades</button>
       <button id="btnFavoritos" type="button">⭐ Favoritos</button>
-      <button id="btnHistorico" type="button">Histórico de Cotações</button>
       <button id="btnScanner" type="button">📷 Scanner EAN</button>
     </nav>
   </header>
@@ -83,47 +120,7 @@
     <section id="catalogo"></section>
     <div id="paginacao" class="paginacao"></div>
   </main>
-
-  <aside id="painelCotacao" class="painel-cotacao">
-    <div class="painel-cabecalho">
-      <h2>Lista de Cotação</h2>
-      <button id="fecharCotacao" type="button">×</button>
-    </div>
-
-    <div class="dados-pdf">
-      <label for="nomePdf">Razão Social da loja ou Comprador responsável:</label>
-      <input type="text" id="nomePdf" placeholder="Ex.: Supermercado São João" autocomplete="off" />
-
-      <label for="cnpjCliente">CNPJ do Cliente:</label>
-      <input type="text" id="cnpjCliente" placeholder="00.000.000/0000-00" maxlength="18" autocomplete="off" />
-    </div>
-
-    <button id="atalhoHistoricoCotacao" class="atalho-historico-cotacao" type="button">
-      <span>📁</span> Acessar Histórico de Cotações
-    </button>
-
-    <div id="listaCotacao" class="lista-cotacao"></div>
-
-    <div class="acoes-cotacao">
-      <button id="limparCotacao" type="button" class="botao-perigo">Limpar carrinho</button>
-      <button id="gerarPdf" type="button">Gerar Cotação em PDF</button>
-      <button id="salvarCotacao" type="button">Salvar Cotação</button>
-    </div>
-  </aside>
-
-  <div id="overlayCotacao" class="overlay-cotacao"></div>
-
-  <aside id="painelHistorico" class="painel-cotacao painel-historico">
-    <div class="painel-cabecalho">
-      <h2>Histórico de Cotações</h2>
-      <button id="fecharHistorico" type="button">×</button>
-    </div>
-    <div id="listaHistoricoCotacoes" class="lista-historico-cotacoes"></div>
-  </aside>
-
-  <div id="overlayHistorico" class="overlay-cotacao"></div>
-
-  <div id="modalScanner" class="modal-scanner" aria-hidden="true">
+<div id="modalScanner" class="modal-scanner" aria-hidden="true">
     <div class="scanner-conteudo">
       <div class="scanner-cabecalho">
         <button id="fecharScanner" class="scanner-voltar" type="button" aria-label="Voltar ao catálogo">
@@ -177,23 +174,10 @@
     </div>
   </div>
   <div id="toast" class="toast"></div>
-
-  <div id="efeitoCotacaoSalva" class="efeito-cotacao-salva" aria-hidden="true">
-    <div class="efeito-salva-card">
-      <div class="efeito-salva-icone">✓</div>
-      <strong>Cotação salva!</strong>
-      <span>A lista foi transferida para o Histórico de Cotações.</span>
-    </div>
-  </div>
-  <div id="efeitoArrastarHistorico" class="efeito-arrastar-historico" aria-hidden="true">
-    <span>📄 Cotação</span>
-  </div>
-
-  <div class="botoes-flutuantes">
-    <button id="btnCarrinhoFlutuante" class="btn-flutuante btn-carrinho-flutuante" type="button" aria-label="Abrir carrinho">
-      🛒 <span id="contadorCotacaoFlutuante">0</span>
-    </button>
-    <button id="btnTopo" class="btn-flutuante btn-topo" type="button" aria-label="Voltar ao topo">↑</button>
+<div class="botoes-flutuantes">
+<button id="btnPdfFlutuante" class="btn-flutuante btn-pdf-flutuante"
+  type="button" aria-label="Gerar PDF dos produtos filtrados" title="Gerar PDF">PDF</button>
+<button id="btnTopo" class="btn-flutuante btn-topo" type="button" aria-label="Voltar ao topo">↑</button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

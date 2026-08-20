@@ -1,8 +1,6 @@
 let produtos = [];
 let produtosFiltrados = [];
-let cotacao = [];
 let favoritos = [];
-let historicoCotacoes = [];
 let scannerStream = null;
 let scannerTrack = null;
 let scannerTorchLigado = false;
@@ -16,14 +14,13 @@ let ultimoCodigoScanner = "";
 let ultimoCodigoScannerEm = 0;
 let modoAtual = "eldorado";
 let paginaAtual = 1;
+let categoriaAtual = "todos";
 
 const ITENS_POR_PAGINA_DESKTOP = 150;
 const ITENS_POR_PAGINA_MOBILE = 80;
 const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
 const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
-const AVISO_ESTOQUE = "⚠️ Verifique a disponibilidade de estoque antes de finalizar esta cotação.";
 const CHAVE_FAVORITOS = "favoritosCatalogoEldorado";
-const CHAVE_HISTORICO = "historicoCotacoesEldorado";
 
 const CONFIG = {
   eldorado: {
@@ -79,16 +76,14 @@ async function carregarProdutos() {
       defval: ""
     });
 
-    const linhas = detectarLinhasDeProdutos(dados);
+    const estrutura = detectarEstruturaDaPlanilha(dados);
 
-    produtos = linhas
-      .map(linha => criarProdutoAPartirDaLinha(linha))
+    produtos = estrutura.linhas
+      .map(linha => criarProdutoAPartirDaLinha(linha, estrutura.indices))
       .filter(produto => produto.codigo || produto.descricao || produto.ean);
 
     marcarNovidades();
     carregarFavoritos();
-    carregarHistoricoCotacoes();
-    carregarCotacaoSalva();
     aplicarFiltros();
 
   } catch (erro) {
@@ -99,20 +94,81 @@ async function carregarProdutos() {
   }
 }
 
-function detectarLinhasDeProdutos(dados) {
-  const indiceCabecalho = dados.findIndex(linha =>
-    linha.some(celula => normalizar(celula).includes("codigo")) &&
-    linha.some(celula => normalizar(celula).includes("descricao"))
-  );
+function detectarEstruturaDaPlanilha(dados) {
+  const indiceCabecalho = dados.findIndex(linha => {
+    const cabecalhos = linha.map(celula => normalizar(celula));
 
-  if (indiceCabecalho >= 0) {
-    return dados.slice(indiceCabecalho + 1);
+    return cabecalhos.some(cabecalho =>
+      cabecalho === "codigo" ||
+      cabecalho.includes("codigo do produto") ||
+      cabecalho.includes("cod produto")
+    ) && cabecalhos.some(cabecalho => cabecalho.includes("descricao"));
+  });
+
+  if (indiceCabecalho < 0) {
+    return {
+      linhas: dados.slice(1),
+      indices: null
+    };
   }
 
-  return dados.slice(1);
+  const cabecalho = dados[indiceCabecalho].map(celula => normalizar(celula));
+
+  const localizar = (...nomes) => {
+    for (const nome of nomes) {
+      const nomeNormalizado = normalizar(nome);
+
+      let indice = cabecalho.findIndex(valor => valor === nomeNormalizado);
+
+      if (indice >= 0) return indice;
+
+      indice = cabecalho.findIndex(valor =>
+        valor && valor.includes(nomeNormalizado)
+      );
+
+      if (indice >= 0) return indice;
+    }
+
+    return -1;
+  };
+
+  return {
+    linhas: dados.slice(indiceCabecalho + 1),
+    indices: {
+      codigo: localizar("codigo do produto", "codigo"),
+      ean: localizar("ean"),
+      descricao: localizar("descricao"),
+      embalagem: localizar("embalagem"),
+      qtdMaster: localizar("qtd master", "quantidade master"),
+      estoque: localizar("estoque"),
+      imagem: localizar("imagem"),
+      codigoFornecedor: localizar("codigo fornecedor", "codigo do fornecedor"),
+      fornecedor: localizar("fornecedor"),
+      categoria: localizar("categoria")
+    }
+  };
 }
 
-function criarProdutoAPartirDaLinha(linha) {
+function criarProdutoAPartirDaLinha(linha, indices = null) {
+  if (indices) {
+    const obter = indice => indice >= 0 ? linha[indice] : "";
+
+    return {
+      codigo: String(obter(indices.codigo) || "").trim(),
+      ean: String(obter(indices.ean) || "").trim(),
+      descricao: String(obter(indices.descricao) || "").trim(),
+      embalagem: String(obter(indices.embalagem) || "").trim(),
+      qtdMaster: String(obter(indices.qtdMaster) || "").trim(),
+      estoque: numeroSeguro(obter(indices.estoque)),
+      imagem: String(obter(indices.imagem) || "").trim(),
+      codigoFornecedor: String(obter(indices.codigoFornecedor) || "").trim(),
+      fornecedor: String(obter(indices.fornecedor) || "").trim(),
+      categoria: String(obter(indices.categoria) || "Demais").trim() || "Demais",
+      novidade: false,
+      relevancia: 999
+    };
+  }
+
   const primeiraColunaVazia = !String(linha[0] || "").trim();
   const inicio = primeiraColunaVazia ? 1 : 0;
 
@@ -126,6 +182,7 @@ function criarProdutoAPartirDaLinha(linha) {
     imagem: String(linha[inicio + 6] || "").trim(),
     codigoFornecedor: String(linha[inicio + 7] || "").trim(),
     fornecedor: String(linha[inicio + 8] || "").trim(),
+    categoria: String(linha[inicio + 9] || "Demais").trim() || "Demais",
     novidade: false,
     relevancia: 999
   };
@@ -161,17 +218,6 @@ function dividirTermos(texto) {
 function codigoNumerico(produto) {
   const codigo = String(produto.codigo || "").replace(/\D/g, "");
   return Number(codigo || 0);
-}
-
-function qtdMasterNumerica(valor) {
-  const numero = numeroSeguro(valor);
-  return numero > 0 ? numero : 1;
-}
-
-function ajustarParaMultiplo(quantidade, qtdMaster) {
-  const master = qtdMasterNumerica(qtdMaster);
-  const qtd = Math.max(master, numeroSeguro(quantidade || master));
-  return Math.ceil(qtd / master) * master;
 }
 
 function marcarNovidades() {
@@ -211,7 +257,82 @@ function produtosDoModo() {
     lista = lista.filter(produto => favoritos.includes(String(produto.codigo).trim()));
   }
 
+  if (categoriaAtual !== "todos") {
+    const categoriaNormalizada = normalizar(categoriaAtual);
+
+    lista = lista.filter(produto =>
+      normalizar(produto.categoria || "Demais") === categoriaNormalizada
+    );
+  }
+
   return lista;
+}
+
+function selecionarCategoria(categoria) {
+  const categoriaSelecionada = String(categoria || "").trim();
+
+  if (!categoriaSelecionada) return;
+
+  if (normalizar(categoriaAtual) === normalizar(categoriaSelecionada)) {
+    categoriaAtual = "todos";
+  } else {
+    categoriaAtual = categoriaSelecionada;
+  }
+
+  atualizarCategoriasAtivas();
+  paginaAtual = 1;
+  aplicarFiltros();
+}
+
+function atualizarCategoriasAtivas() {
+  document.querySelectorAll(".categoria-btn").forEach(botao => {
+    const ativa =
+      categoriaAtual !== "todos" &&
+      normalizar(botao.dataset.categoria) === normalizar(categoriaAtual);
+
+    botao.classList.toggle("ativo", ativa);
+    botao.setAttribute("aria-pressed", ativa ? "true" : "false");
+  });
+}
+
+function limparCategoriaSelecionada() {
+  categoriaAtual = "todos";
+  atualizarCategoriasAtivas();
+}
+
+function configurarAnimacaoCategorias() {
+  const nav = document.getElementById("categoriasNav");
+
+  if (nav) {
+    nav.addEventListener("pointermove", event => {
+      const rect = nav.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+      nav.style.setProperty("--categorias-mouse-x", `${x}%`);
+      nav.style.setProperty("--categorias-mouse-y", `${y}%`);
+    });
+  }
+
+  document.querySelectorAll(".categoria-btn").forEach(botao => {
+    botao.addEventListener("pointermove", event => {
+      const rect = botao.getBoundingClientRect();
+
+      botao.style.setProperty(
+        "--categoria-mouse-x",
+        `${event.clientX - rect.left}px`
+      );
+
+      botao.style.setProperty(
+        "--categoria-mouse-y",
+        `${event.clientY - rect.top}px`
+      );
+    });
+
+    botao.addEventListener("click", () => {
+      selecionarCategoria(botao.dataset.categoria);
+    });
+  });
 }
 
 function aplicarFiltroEstoque(lista) {
@@ -672,19 +793,10 @@ function mostrarProdutos() {
       <div class="info">QTD Master: ${produto.qtdMaster || "Não informada"}</div>
       <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
       <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
-
-      <div class="card-acoes">
-        <button class="btn-adicionar-cotacao" type="button" title="Adicionar à cotação">🛒 Adicionar à cotação</button>
-      </div>
     `;
 
     card.querySelector(".btn-favorito").addEventListener("click", () => {
       alternarFavorito(produto);
-    });
-
-    card.querySelector(".btn-adicionar-cotacao").addEventListener("click", () => {
-      adicionarNaCotacao(produto);
-      aplicarEfeitoCardAdicionado(card);
     });
 
     catalogo.appendChild(card);
@@ -692,59 +804,6 @@ function mostrarProdutos() {
 
   renderizarPaginacao(paginacaoSuperior, totalPaginas);
   renderizarPaginacao(paginacao, totalPaginas);
-}
-
-function aplicarEfeitoCardAdicionado(card) {
-  card.classList.remove("produto-adicionado");
-  void card.offsetWidth;
-  card.classList.add("produto-adicionado");
-
-  setTimeout(() => {
-    card.classList.remove("produto-adicionado");
-  }, 900);
-}
-
-function adicionarNaCotacao(produto) {
-  const codigo = String(produto.codigo).trim();
-  const itemExistente = cotacao.find(item => String(item.codigo).trim() === codigo);
-  const master = qtdMasterNumerica(produto.qtdMaster);
-
-  if (itemExistente) {
-    itemExistente.quantidade = ajustarParaMultiplo(numeroSeguro(itemExistente.quantidade) + master, master);
-  } else {
-    cotacao.push({
-      codigo: produto.codigo,
-      descricao: produto.descricao,
-      ean: produto.ean,
-      quantidade: master,
-      qtdMaster: master,
-      estoque: numeroSeguro(produto.estoque)
-    });
-  }
-
-  salvarCotacao();
-  renderizarCotacao();
-  mostrarToast("Produto adicionado à cotação.");
-}
-
-function removerDaCotacao(codigo) {
-  cotacao = cotacao.filter(item => String(item.codigo).trim() !== String(codigo).trim());
-  salvarCotacao();
-  renderizarCotacao();
-}
-
-function atualizarQuantidade(codigo, quantidade) {
-  const item = cotacao.find(item => String(item.codigo).trim() === String(codigo).trim());
-
-  if (!item) return;
-
-  item.quantidade = ajustarParaMultiplo(quantidade, item.qtdMaster);
-  salvarCotacao();
-  renderizarCotacao();
-}
-
-function salvarCotacao() {
-  localStorage.setItem("cotacaoEldorado", JSON.stringify(cotacao));
 }
 
 function carregarFavoritos() {
@@ -783,433 +842,6 @@ function alternarFavorito(produto) {
   }
 }
 
-function carregarHistoricoCotacoes() {
-  try {
-    historicoCotacoes = JSON.parse(localStorage.getItem(CHAVE_HISTORICO)) || [];
-  } catch {
-    historicoCotacoes = [];
-  }
-}
-
-function salvarHistoricoCotacoes() {
-  localStorage.setItem(CHAVE_HISTORICO, JSON.stringify(historicoCotacoes));
-}
-
-function carregarCotacaoSalva() {
-  try {
-    cotacao = JSON.parse(localStorage.getItem("cotacaoEldorado")) || [];
-  } catch {
-    cotacao = [];
-  }
-
-  renderizarCotacao();
-}
-
-function deveAvisarEstoque(item) {
-  const estoque = numeroSeguro(item.estoque);
-  const master = qtdMasterNumerica(item.qtdMaster);
-  const quantidade = numeroSeguro(item.quantidade);
-
-  if (estoque <= 0 || master <= 0 || quantidade <= 0) return false;
-
-  const limiteAviso = estoque - (master * 3);
-  return quantidade >= limiteAviso;
-}
-
-function renderizarCotacao() {
-  const contador = cotacao.length;
-
-  document.getElementById("contadorCotacao").innerText = contador;
-  document.getElementById("contadorCotacaoFlutuante").innerText = contador;
-
-  const lista = document.getElementById("listaCotacao");
-  lista.innerHTML = "";
-
-  if (!cotacao.length) {
-    lista.innerHTML = "<p>Nenhum produto adicionado à cotação.</p>";
-    return;
-  }
-
-  cotacao.forEach(item => {
-    const master = qtdMasterNumerica(item.qtdMaster);
-
-    const div = document.createElement("div");
-    div.className = "item-cotacao";
-
-    div.innerHTML = `
-      <strong>Código do Produto: ${item.codigo}</strong>
-      <p><b>Descrição:</b> ${item.descricao || "Não informada"}</p>
-      <p><b>EAN:</b> ${item.ean || "Não informado"}</p>
-
-      <div class="item-cotacao-acoes">
-        <label>
-          Quantidade desejada
-          <input type="number" min="${master}" step="${master}" value="${item.quantidade}" />
-        </label>
-
-        <button type="button">Remover</button>
-      </div>
-
-      <p><b>Múltiplo QTD Master:</b> ${master}</p>
-      ${deveAvisarEstoque(item) ? `<div class="aviso-estoque">${AVISO_ESTOQUE}</div>` : ""}
-    `;
-
-    div.querySelector("input").addEventListener("change", event => {
-      atualizarQuantidade(item.codigo, event.target.value);
-    });
-
-    div.querySelector("button").addEventListener("click", () => {
-      removerDaCotacao(item.codigo);
-    });
-
-    lista.appendChild(div);
-  });
-}
-
-function formatarCNPJ(valor) {
-  return valor
-    .replace(/\D/g, "")
-    .replace(/^(\d{2})(\d)/, "$1.$2")
-    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/\.(\d{3})(\d)/, ".$1/$2")
-    .replace(/(\d{4})(\d)/, "$1-$2")
-    .slice(0, 18);
-}
-
-function gerarTextoCotacao() {
-  const nomeInformado = document.getElementById("nomePdf").value.trim();
-  const cnpjCliente = document.getElementById("cnpjCliente").value.trim();
-
-  let texto = "SOLICITAÇÃO DE COTAÇÃO\n";
-  texto += "Catálogo ilustrativo. Não caracteriza Pedido de Compra. Confirmar disponibilidade, preço e condições comerciais com o RCA.\n\n";
-
-  if (nomeInformado) texto += `Razão Social/Comprador: ${nomeInformado}\n`;
-  if (cnpjCliente) texto += `CNPJ: ${cnpjCliente}\n`;
-
-  texto += "\n";
-
-  cotacao.forEach((item, index) => {
-    texto += `${index + 1}) Código do Produto: ${item.codigo}\n`;
-    texto += `Descrição: ${item.descricao || "Não informada"}\n`;
-    texto += `EAN: ${item.ean || "Não informado"}\n`;
-    texto += `Quantidade desejada: ${item.quantidade}\n\n`;
-  });
-
-  return texto.trim();
-}
-
-function perguntarManterOuLimpar() {
-  const limpar = confirm("Cotação concluída. Deseja limpar o carrinho?\n\nOK = Limpar carrinho\nCancelar = Manter carrinho");
-
-  if (limpar) {
-    cotacao = [];
-    salvarCotacao();
-    renderizarCotacao();
-    mostrarToast("Carrinho limpo.");
-  } else {
-    mostrarToast("Carrinho mantido.");
-  }
-}
-
-function obterTituloCotacao() {
-  const nomeInformado = document.getElementById("nomePdf").value.trim();
-
-  if (nomeInformado) return nomeInformado;
-
-  const titulo = prompt("Informe um título para salvar esta cotação no histórico:");
-  return String(titulo || "").trim();
-}
-
-function salvarCotacaoNoHistorico() {
-  if (!cotacao.length) {
-    alert("Nenhum produto foi adicionado à cotação.");
-    return;
-  }
-
-  const titulo = obterTituloCotacao();
-
-  if (!titulo) {
-    alert("Para salvar no histórico, informe a Razão Social ou um título para a cotação.");
-    return;
-  }
-
-  const registro = {
-    id: Date.now(),
-    titulo,
-    data: new Date().toLocaleString("pt-BR"),
-    razaoSocial: document.getElementById("nomePdf").value.trim(),
-    cnpj: document.getElementById("cnpjCliente").value.trim(),
-    itens: cotacao.map(item => ({ ...item })),
-    texto: gerarTextoCotacao()
-  };
-
-  historicoCotacoes.unshift(registro);
-  historicoCotacoes = historicoCotacoes.slice(0, 60);
-  salvarHistoricoCotacoes();
-  renderizarHistoricoCotacoes();
-  mostrarEfeitoCotacaoSalva();
-  setTimeout(() => {
-    perguntarManterOuLimpar();
-  }, 900);
-}
-
-
-function mostrarEfeitoCotacaoSalva() {
-  animarCotacaoParaHistorico();
-
-  const efeito = document.getElementById("efeitoCotacaoSalva");
-
-  if (!efeito) {
-    mostrarToast("Cotação salva no histórico.");
-    return;
-  }
-
-  setTimeout(() => {
-    efeito.classList.remove("visivel");
-    void efeito.offsetWidth;
-    efeito.classList.add("visivel");
-
-    setTimeout(() => {
-      efeito.classList.remove("visivel");
-    }, 1500);
-  }, 650);
-}
-
-function animarCotacaoParaHistorico() {
-  const efeito = document.getElementById("efeitoArrastarHistorico");
-  const destino = document.getElementById("atalhoHistoricoCotacao") || document.getElementById("btnHistorico");
-
-  if (!efeito || !destino) return;
-
-  const rect = destino.getBoundingClientRect();
-  const destinoX = rect.left + rect.width / 2 - window.innerWidth / 2;
-  const destinoY = rect.top + rect.height / 2 - window.innerHeight / 2;
-
-  efeito.style.setProperty("--destino-x", `${destinoX}px`);
-  efeito.style.setProperty("--destino-y", `${destinoY}px`);
-  efeito.classList.remove("animar");
-  void efeito.offsetWidth;
-  efeito.classList.add("animar");
-
-  destino.classList.remove("destacado");
-  setTimeout(() => destino.classList.add("destacado"), 650);
-  setTimeout(() => {
-    efeito.classList.remove("animar");
-    destino.classList.remove("destacado");
-  }, 1300);
-}
-
-function textoCotacaoHistorico(registro) {
-  let texto = "SOLICITAÇÃO DE COTAÇÃO\n";
-  texto += `Título: ${registro.titulo}\n`;
-  if (registro.razaoSocial) texto += `Razão Social/Comprador: ${registro.razaoSocial}\n`;
-  if (registro.cnpj) texto += `CNPJ: ${registro.cnpj}\n`;
-  texto += `Data: ${registro.data}\n\n`;
-
-  registro.itens.forEach((item, index) => {
-    texto += `${index + 1}) Código do Produto: ${item.codigo}\n`;
-    texto += `Descrição: ${item.descricao || "Não informada"}\n`;
-    texto += `EAN: ${item.ean || "Não informado"}\n`;
-    texto += `Quantidade desejada: ${item.quantidade}\n\n`;
-  });
-
-  return texto.trim();
-}
-
-function compartilharHistoricoWhatsApp(id) {
-  const registro = historicoCotacoes.find(item => String(item.id) === String(id));
-  if (!registro) return;
-
-  const texto = encodeURIComponent(textoCotacaoHistorico(registro));
-  window.open(`https://wa.me/?text=${texto}`, "_blank");
-}
-
-function editarHistoricoCotacao(id) {
-  const registro = historicoCotacoes.find(item => String(item.id) === String(id));
-  if (!registro) return;
-
-  const substituir = !cotacao.length || confirm("Deseja carregar esta cotação salva para edição? A lista atual será substituída.");
-  if (!substituir) return;
-
-  cotacao = registro.itens.map(item => ({ ...item }));
-  document.getElementById("nomePdf").value = registro.razaoSocial || registro.titulo || "";
-  document.getElementById("cnpjCliente").value = registro.cnpj || "";
-  salvarCotacao();
-  renderizarCotacao();
-  fecharHistorico();
-  abrirCotacao();
-  mostrarToast("Cotação carregada para edição.");
-}
-
-function removerHistoricoCotacao(id) {
-  const confirmar = confirm("Deseja remover esta cotação do histórico?");
-  if (!confirmar) return;
-
-  historicoCotacoes = historicoCotacoes.filter(item => String(item.id) !== String(id));
-  salvarHistoricoCotacoes();
-  renderizarHistoricoCotacoes();
-}
-
-function renderizarHistoricoCotacoes() {
-  const lista = document.getElementById("listaHistoricoCotacoes");
-  if (!lista) return;
-
-  lista.innerHTML = "";
-
-  if (!historicoCotacoes.length) {
-    lista.innerHTML = "<p>Nenhuma cotação salva no histórico.</p>";
-    return;
-  }
-
-  historicoCotacoes.forEach(registro => {
-    const div = document.createElement("div");
-    div.className = "item-historico-cotacao";
-    div.innerHTML = `
-      <strong>${registro.titulo}</strong>
-      <p>${registro.data}</p>
-      <p>${registro.itens.length} produtos na cotação</p>
-      <div class="historico-acoes">
-        <button type="button" class="btn-editar-historico">Editar cotação</button>
-        <button type="button" class="btn-whatsapp">Compartilhar via WhatsApp</button>
-        <button type="button" class="btn-remover-historico">Remover</button>
-      </div>
-    `;
-
-    div.querySelector(".btn-editar-historico").addEventListener("click", () => editarHistoricoCotacao(registro.id));
-    div.querySelector(".btn-whatsapp").addEventListener("click", () => compartilharHistoricoWhatsApp(registro.id));
-    div.querySelector(".btn-remover-historico").addEventListener("click", () => removerHistoricoCotacao(registro.id));
-    lista.appendChild(div);
-  });
-}
-
-function abrirHistorico() {
-  renderizarHistoricoCotacoes();
-  document.getElementById("painelHistorico").classList.add("aberto");
-  document.getElementById("overlayHistorico").classList.add("aberto");
-  document.body.classList.add("cotacao-aberta");
-}
-
-function fecharHistorico() {
-  document.getElementById("painelHistorico").classList.remove("aberto");
-  document.getElementById("overlayHistorico").classList.remove("aberto");
-  document.body.classList.remove("cotacao-aberta");
-}
-
-function limparCotacao() {
-  if (!cotacao.length) return;
-
-  const confirmar = confirm("Deseja limpar toda a lista de cotação?");
-
-  if (!confirmar) return;
-
-  cotacao = [];
-  salvarCotacao();
-  renderizarCotacao();
-}
-
-function limparNomeArquivo(texto) {
-  return normalizar(texto)
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "_")
-    .toUpperCase();
-}
-
-async function gerarPdfCotacao() {
-  if (!cotacao.length) {
-    alert("Nenhum produto foi adicionado à cotação.");
-    return;
-  }
-
-  const nomeInformado = document.getElementById("nomePdf").value.trim();
-  const cnpjCliente = document.getElementById("cnpjCliente").value.trim();
-
-  if (!nomeInformado) {
-    alert("Informe a Razão Social da loja ou o Comprador responsável para nomear o PDF.");
-    return;
-  }
-
-  if (!cnpjCliente) {
-    alert("Informe o CNPJ do Cliente.");
-    return;
-  }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF("p", "mm", "a4");
-
-  const dataAtual = new Date().toLocaleDateString("pt-BR");
-  const totalItens = cotacao.reduce((soma, item) => soma + numeroSeguro(item.quantidade), 0);
-
-  try {
-    doc.addImage("Logos/Eldorado.png", "PNG", 14, 10, 42, 22);
-  } catch {}
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("SOLICITAÇÃO DE COTAÇÃO", 14, 42);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text(`Razão Social/Comprador: ${nomeInformado}`, 14, 51);
-  doc.text(`CNPJ: ${cnpjCliente}`, 14, 58);
-  doc.text(`Data: ${dataAtual}`, 14, 65);
-  doc.text(`Produtos distintos: ${cotacao.length}`, 14, 72);
-  doc.text(`Total de itens solicitados: ${totalItens}`, 14, 79);
-
-  const linhas = cotacao.map(item => [
-    item.codigo || "",
-    item.descricao || "",
-    item.ean || "",
-    String(item.quantidade || 1)
-  ]);
-
-  doc.autoTable({
-    startY: 88,
-    head: [["Código", "Descrição", "EAN", "Quantidade"]],
-    body: linhas,
-    styles: {
-      fontSize: 8,
-      cellPadding: 2
-    },
-    headStyles: {
-      fillColor: [0, 150, 57],
-      textColor: [255, 255, 255]
-    },
-    columnStyles: {
-      0: { cellWidth: 25 },
-      1: { cellWidth: 90 },
-      2: { cellWidth: 45 },
-      3: { cellWidth: 25, halign: "center" }
-    }
-  });
-
-  const yFinal = doc.lastAutoTable.finalY + 10;
-
-  doc.setFontSize(8);
-  doc.text(
-    "Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização.",
-    14,
-    yFinal,
-    { maxWidth: 180 }
-  );
-
-  const nomeArquivo = `COTACAO_${limparNomeArquivo(nomeInformado)}.pdf`;
-  doc.save(nomeArquivo);
-
-  mostrarToast("PDF gerado com sucesso.");
-  perguntarManterOuLimpar();
-}
-
-function abrirCotacao() {
-  document.getElementById("painelCotacao").classList.add("aberto");
-  document.getElementById("overlayCotacao").classList.add("aberto");
-  document.body.classList.add("cotacao-aberta");
-}
-
-function fecharCotacao() {
-  document.getElementById("painelCotacao").classList.remove("aberto");
-  document.getElementById("overlayCotacao").classList.remove("aberto");
-  document.body.classList.remove("cotacao-aberta");
-}
 
 function limparFiltros() {
   document.getElementById("buscaPrincipal").value = "";
@@ -1218,6 +850,7 @@ function limparFiltros() {
   document.getElementById("ordenacao").value = modoAtual === "novidades" ? "codigo-decrescente" : "maior-estoque";
   document.getElementById("filtroEstoque").value = "com-estoque";
   document.getElementById("sugestoesFornecedor").classList.remove("ativo");
+  limparCategoriaSelecionada();
 
   paginaAtual = 1;
   aplicarFiltros();
@@ -1666,6 +1299,138 @@ function fecharScanner() {
   document.body.classList.remove("scanner-aberto");
 }
 
+
+function obterRotuloCategoriaAtual() {
+  return categoriaAtual === "todos" ? "Todas as Categorias" : categoriaAtual;
+}
+
+function gerarPdfProdutosFiltrados() {
+  if (!produtosFiltrados.length) {
+    alert("Nenhum produto encontrado com os filtros atuais.");
+    return;
+  }
+
+  if (!window.jspdf?.jsPDF) {
+    alert("Não foi possível carregar o gerador de PDF.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("p", "mm", "a4");
+
+  const dataAtual = new Date().toLocaleDateString("pt-BR");
+  const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
+  const codigoFornecedor = document.getElementById("buscaCodigoFornecedor").value.trim();
+  const fornecedor = document.getElementById("buscaFornecedor").value.trim();
+  const filtroEstoque = document.getElementById("filtroEstoque");
+  const rotuloEstoque = filtroEstoque.options[filtroEstoque.selectedIndex]?.text || "";
+  const categoria = obterRotuloCategoriaAtual();
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("CATÁLOGO ELDORADO", 14, 18);
+
+  doc.setFontSize(13);
+  doc.text("Produtos filtrados", 14, 26);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+
+  let y = 34;
+
+  doc.text(`Data: ${dataAtual}`, 14, y);
+  y += 5;
+
+  doc.text(`Categoria: ${categoria}`, 14, y);
+  y += 5;
+
+  if (buscaPrincipal) {
+    doc.text(`Busca: ${buscaPrincipal}`, 14, y, { maxWidth: 180 });
+    y += 5;
+  }
+
+  if (codigoFornecedor) {
+    doc.text(`Código Fornecedor: ${codigoFornecedor}`, 14, y);
+    y += 5;
+  }
+
+  if (fornecedor) {
+    doc.text(`Fornecedor: ${fornecedor}`, 14, y, { maxWidth: 180 });
+    y += 5;
+  }
+
+  doc.text(`Estoque: ${rotuloEstoque}`, 14, y, { maxWidth: 180 });
+  y += 5;
+
+  doc.text(`Total de produtos: ${produtosFiltrados.length}`, 14, y);
+  y += 7;
+
+  const linhas = produtosFiltrados.map(produto => [
+    produto.codigo || "",
+    produto.descricao || "",
+    produto.ean || "",
+    produto.embalagem || "",
+    produto.qtdMaster || "",
+    produto.fornecedor || ""
+  ]);
+
+  doc.autoTable({
+    startY: y,
+    head: [[
+      "Código",
+      "Descrição",
+      "EAN",
+      "Embalagem",
+      "QTD Master",
+      "Fornecedor"
+    ]],
+    body: linhas,
+    styles: {
+      fontSize: 7,
+      cellPadding: 1.6,
+      overflow: "linebreak",
+      valign: "middle"
+    },
+    headStyles: {
+      fillColor: [0, 150, 57],
+      textColor: [255, 255, 255],
+      fontStyle: "bold"
+    },
+    columnStyles: {
+      0: { cellWidth: 18 },
+      1: { cellWidth: 62 },
+      2: { cellWidth: 31 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 18, halign: "center" },
+      5: { cellWidth: 35 }
+    },
+    margin: {
+      left: 10,
+      right: 10,
+      bottom: 14
+    },
+    didDrawPage: () => {
+      const pageHeight = doc.internal.pageSize.height;
+      doc.setFontSize(7);
+      doc.setTextColor(90);
+      doc.text(
+        "Catálogo ilustrativo. Consulte disponibilidade, preço e condições comerciais com o RCA.",
+        10,
+        pageHeight - 7
+      );
+      doc.setTextColor(0);
+    }
+  });
+
+  const nomeCategoria = normalizar(categoria)
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+
+  doc.save(`CATALOGO_ELDORADO_${nomeCategoria || "PRODUTOS"}.pdf`);
+  mostrarToast("PDF gerado com os produtos filtrados.");
+}
+
 document.getElementById("buscaPrincipal").addEventListener("input", aplicarFiltros);
 document.getElementById("buscaCodigoFornecedor").addEventListener("input", aplicarFiltros);
 
@@ -1683,18 +1448,10 @@ document.getElementById("filtroEstoque").addEventListener("change", () => {
   aplicarFiltros();
 });
 
-document.getElementById("cnpjCliente").addEventListener("input", event => {
-  event.target.value = formatarCNPJ(event.target.value);
-});
 
+document.getElementById("btnGerarPdfProdutos").addEventListener("click", gerarPdfProdutosFiltrados);
+document.getElementById("btnPdfFlutuante").addEventListener("click", gerarPdfProdutosFiltrados);
 document.getElementById("btnLimparFiltros").addEventListener("click", limparFiltros);
-document.getElementById("btnCotacao").addEventListener("click", abrirCotacao);
-document.getElementById("btnCarrinhoFlutuante").addEventListener("click", abrirCotacao);
-document.getElementById("fecharCotacao").addEventListener("click", fecharCotacao);
-document.getElementById("overlayCotacao").addEventListener("click", fecharCotacao);
-document.getElementById("salvarCotacao").addEventListener("click", salvarCotacaoNoHistorico);
-document.getElementById("limparCotacao").addEventListener("click", limparCotacao);
-document.getElementById("gerarPdf").addEventListener("click", gerarPdfCotacao);
 
 document.getElementById("btnMenu").addEventListener("click", function(event) {
   event.stopPropagation();
@@ -1717,18 +1474,8 @@ document.getElementById("btnFavoritos").addEventListener("click", () => {
   trocarModo("favoritos");
 });
 
-document.getElementById("btnHistorico").addEventListener("click", () => {
-  abrirHistorico();
-  fecharMenu();
-});
 
-const atalhoHistoricoCotacao = document.getElementById("atalhoHistoricoCotacao");
-if (atalhoHistoricoCotacao) {
-  atalhoHistoricoCotacao.addEventListener("click", abrirHistorico);
-}
 
-document.getElementById("fecharHistorico").addEventListener("click", fecharHistorico);
-document.getElementById("overlayHistorico").addEventListener("click", fecharHistorico);
 
 document.getElementById("btnScanner").addEventListener("click", () => {
   abrirScanner();
@@ -1783,15 +1530,15 @@ window.addEventListener("beforeunload", () => {
 });
 
 const btnTopo = document.getElementById("btnTopo");
-const btnCarrinhoFlutuante = document.getElementById("btnCarrinhoFlutuante");
+const btnPdfFlutuante = document.getElementById("btnPdfFlutuante");
 
 window.addEventListener("scroll", () => {
   if (window.scrollY > 300) {
     btnTopo.classList.add("visivel");
-    btnCarrinhoFlutuante.classList.add("visivel");
+    btnPdfFlutuante.classList.add("visivel");
   } else {
     btnTopo.classList.remove("visivel");
-    btnCarrinhoFlutuante.classList.remove("visivel");
+    btnPdfFlutuante.classList.remove("visivel");
   }
 });
 
@@ -1814,4 +1561,6 @@ window.addEventListener("resize", () => {
 });
 
 document.getElementById("ordenacao").value = "maior-estoque";
+configurarAnimacaoCategorias();
+atualizarCategoriasAtivas();
 carregarProdutos();
