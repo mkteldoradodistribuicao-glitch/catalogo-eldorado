@@ -185,6 +185,11 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
   <script src="script.js"></script>
+  <script type="module">
+    // Vercel Web Analytics
+    import { inject } from './node_modules/@vercel/analytics/dist/index.mjs';
+    inject();
+  </script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
