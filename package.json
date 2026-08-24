@@ -1,0 +1,28 @@
+{
+  "name": "catalogo-eldorado",
+  "version": "1.0.0",
+  "description": "Catálogo Digital Eldorado - Consulta de produtos por código, descrição, EAN, fornecedor",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mkteldoradodistribuicao-glitch/catalogo-eldorado.git"
+  },
+  "keywords": [
+    "catalogo",
+    "eldorado",
+    "produtos",
+    "distribuicao"
+  ],
+  "author": "Eldorado Distribuição",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mkteldoradodistribuicao-glitch/catalogo-eldorado/issues"
+  },
+  "homepage": "https://github.com/mkteldoradodistribuicao-glitch/catalogo-eldorado#readme",
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  }
+}
