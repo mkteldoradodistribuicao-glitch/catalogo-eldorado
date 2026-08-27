@@ -1,3 +1,12 @@
+let perfilAtual = "nenhum";
+
+const ACESSO_ADMIN = {
+  usuario: "admin",
+  senha: "eldorado2026"
+};
+
+const CHAVE_SESSAO_ACESSO = "catalogoEldoradoPerfil";
+
 let produtos = [];
 let produtosFiltrados = [];
 let favoritos = [];
@@ -58,6 +67,169 @@ const CONFIG = {
     filtroFavoritos: true
   }
 };
+
+
+function definirEtapaPortal(etapa) {
+  const escolha = document.getElementById("portalEscolha");
+  const login = document.getElementById("portalLoginAdmin");
+
+  escolha?.classList.toggle("ativo", etapa === "escolha");
+  login?.classList.toggle("ativo", etapa === "admin");
+
+  if (etapa === "admin") {
+    setTimeout(() => document.getElementById("usuarioAdministrador")?.focus(), 120);
+  }
+}
+
+function aplicarPerfilCatalogo(perfil) {
+  perfilAtual = perfil;
+  document.body.dataset.perfil = perfil;
+
+  const perfilNome = document.getElementById("perfilAcessoNome");
+  if (perfilNome) {
+    perfilNome.textContent = perfil === "administrador" ? "Administrador" : "Cliente";
+  }
+
+  const subtitulo = document.getElementById("subtituloCatalogo");
+
+  if (perfil === "cliente") {
+    document.getElementById("buscaCodigoFornecedor").value = "";
+    document.getElementById("buscaFornecedor").value = "";
+    document.getElementById("sugestoesFornecedor").classList.remove("ativo");
+
+    if (modoAtual === "eldorado" && subtitulo) {
+      subtitulo.textContent =
+        "Consulte produtos por código, descrição ou EAN.";
+    }
+  } else if (modoAtual === "eldorado" && subtitulo) {
+    subtitulo.textContent = CONFIG.eldorado.subtitulo;
+  }
+
+  if (Array.isArray(produtos) && produtos.length) {
+    aplicarFiltros();
+  }
+}
+
+function concluirAcessoCatalogo(perfil) {
+  aplicarPerfilCatalogo(perfil);
+
+  sessionStorage.setItem(CHAVE_SESSAO_ACESSO, perfil);
+
+  const portal = document.getElementById("portalAcesso");
+  portal?.classList.add("oculto");
+
+  setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, 30);
+}
+
+function entrarComoCliente() {
+  concluirAcessoCatalogo("cliente");
+}
+
+function validarLoginAdministrador(event) {
+  event.preventDefault();
+
+  const usuario = document.getElementById("usuarioAdministrador").value.trim();
+  const senha = document.getElementById("senhaAdministrador").value;
+  const erro = document.getElementById("erroLoginAdministrador");
+
+  if (
+    usuario === ACESSO_ADMIN.usuario &&
+    senha === ACESSO_ADMIN.senha
+  ) {
+    if (erro) erro.textContent = "";
+    document.getElementById("senhaAdministrador").value = "";
+    concluirAcessoCatalogo("administrador");
+    return;
+  }
+
+  if (erro) {
+    erro.textContent = "Usuário ou senha inválidos.";
+  }
+
+  const form = document.getElementById("formLoginAdministrador");
+  form?.animate(
+    [
+      { transform: "translateX(0)" },
+      { transform: "translateX(-6px)" },
+      { transform: "translateX(6px)" },
+      { transform: "translateX(-4px)" },
+      { transform: "translateX(0)" }
+    ],
+    { duration: 280, easing: "ease" }
+  );
+}
+
+function sairDoCatalogo() {
+  sessionStorage.removeItem(CHAVE_SESSAO_ACESSO);
+  perfilAtual = "nenhum";
+  document.body.dataset.perfil = "nenhum";
+
+  limparFiltros();
+
+  const portal = document.getElementById("portalAcesso");
+  portal?.classList.remove("oculto");
+
+  definirEtapaPortal("escolha");
+
+  document.getElementById("usuarioAdministrador").value = "";
+  document.getElementById("senhaAdministrador").value = "";
+  document.getElementById("erroLoginAdministrador").textContent = "";
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function restaurarSessaoAcesso() {
+  const perfilSalvo = sessionStorage.getItem(CHAVE_SESSAO_ACESSO);
+
+  if (perfilSalvo === "cliente" || perfilSalvo === "administrador") {
+    aplicarPerfilCatalogo(perfilSalvo);
+    document.getElementById("portalAcesso")?.classList.add("oculto");
+    return;
+  }
+
+  perfilAtual = "nenhum";
+  document.body.dataset.perfil = "nenhum";
+  definirEtapaPortal("escolha");
+}
+
+function configurarPortalAcesso() {
+  document.getElementById("btnAcessoCliente")
+    ?.addEventListener("click", entrarComoCliente);
+
+  document.getElementById("btnAcessoAdministrador")
+    ?.addEventListener("click", () => definirEtapaPortal("admin"));
+
+  document.getElementById("btnVoltarEscolhaAcesso")
+    ?.addEventListener("click", () => definirEtapaPortal("escolha"));
+
+  document.getElementById("formLoginAdministrador")
+    ?.addEventListener("submit", validarLoginAdministrador);
+
+  document.getElementById("btnSairAcesso")
+    ?.addEventListener("click", sairDoCatalogo);
+
+  document.getElementById("btnMostrarSenhaAdmin")
+    ?.addEventListener("click", () => {
+      const campo = document.getElementById("senhaAdministrador");
+      campo.type = campo.type === "password" ? "text" : "password";
+    });
+
+  document.querySelectorAll(".portal-card").forEach(card => {
+    card.addEventListener("pointermove", event => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${event.clientX - rect.left}px`);
+      card.style.setProperty("--my", `${event.clientY - rect.top}px`);
+    });
+  });
+
+  restaurarSessaoAcesso();
+}
+
+function usuarioEhAdministrador() {
+  return perfilAtual === "administrador";
+}
 
 async function carregarProdutos() {
   try {
@@ -623,8 +795,12 @@ function fornecedorCombina(produtoFornecedor, buscaFornecedor) {
 
 function gerarMensagemSemResultado() {
   const buscaPrincipal = document.getElementById("buscaPrincipal").value.trim();
-  const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value.trim();
-  const buscaFornecedor = document.getElementById("buscaFornecedor").value.trim();
+  const buscaCodigoFornecedor = usuarioEhAdministrador()
+    ? document.getElementById("buscaCodigoFornecedor").value.trim()
+    : "";
+  const buscaFornecedor = usuarioEhAdministrador()
+    ? document.getElementById("buscaFornecedor").value.trim()
+    : "";
 
   const partes = [];
 
@@ -641,8 +817,12 @@ function gerarMensagemSemResultado() {
 
 function aplicarFiltros() {
   const buscaPrincipal = document.getElementById("buscaPrincipal").value;
-  const buscaCodigoFornecedor = document.getElementById("buscaCodigoFornecedor").value;
-  const buscaFornecedor = document.getElementById("buscaFornecedor").value;
+  const buscaCodigoFornecedor = usuarioEhAdministrador()
+    ? document.getElementById("buscaCodigoFornecedor").value
+    : "";
+  const buscaFornecedor = usuarioEhAdministrador()
+    ? document.getElementById("buscaFornecedor").value
+    : "";
 
   let resultado = aplicarFiltroEstoque(produtosDoModo());
 
@@ -791,8 +971,14 @@ function mostrarProdutos() {
       <div class="info">EAN: ${produto.ean || "Não informado"}</div>
       <div class="info">Embalagem: ${produto.embalagem || "Não informada"}</div>
       <div class="info">QTD Master: ${produto.qtdMaster || "Não informada"}</div>
-      <div class="info">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
-      <div class="fornecedor">${produto.fornecedor || "Fornecedor não informado"}</div>
+      ${
+        usuarioEhAdministrador()
+          ? `
+            <div class="info info-administrativa">Código Fornecedor: ${produto.codigoFornecedor || "Não informado"}</div>
+            <div class="fornecedor info-administrativa">${produto.fornecedor || "Fornecedor não informado"}</div>
+          `
+          : ""
+      }
     `;
 
     card.querySelector(".btn-favorito").addEventListener("click", () => {
@@ -874,7 +1060,10 @@ function trocarModo(novoModo) {
     document.body.className = `${config.tema} trocando-catalogo`;
     document.getElementById("logoCatalogo").src = config.logo;
     document.getElementById("tituloCatalogo").innerText = config.titulo;
-    document.getElementById("subtituloCatalogo").innerText = config.subtitulo;
+    document.getElementById("subtituloCatalogo").innerText =
+      perfilAtual === "cliente" && novoModo === "eldorado"
+        ? "Consulte produtos por código, descrição ou EAN."
+        : config.subtitulo;
 
     limparFiltros();
 
@@ -1608,7 +1797,9 @@ async function gerarPdfProdutosFiltrados() {
   const categoria = obterRotuloCategoriaAtual();
   const dataAtual = new Date().toLocaleDateString("pt-BR");
   const buscaPrincipal = document.getElementById("buscaPrincipal")?.value.trim() || "";
-  const codigoFornecedor = document.getElementById("buscaCodigoFornecedor")?.value.trim() || "";
+  const codigoFornecedor = usuarioEhAdministrador()
+    ? document.getElementById("buscaCodigoFornecedor")?.value.trim() || ""
+    : "";
   const filtroEstoque = document.getElementById("filtroEstoque");
   const rotuloEstoque = filtroEstoque?.options[filtroEstoque.selectedIndex]?.text || "";
 
@@ -1867,4 +2058,5 @@ configurarAnimacaoCabecalho();
 configurarRodapeCatalogo();
 configurarAnimacaoCategorias();
 atualizarCategoriasAtivas();
+configurarPortalAcesso();
 carregarProdutos();

@@ -9,7 +9,114 @@
   <meta name="theme-color" content="#009639" />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="tema-eldorado">
+<body class="tema-eldorado" data-perfil="nenhum">
+
+  <section id="portalAcesso" class="portal-acesso" aria-label="Acesso ao Catálogo Eldorado">
+    <div class="portal-bg">
+      <span class="portal-orbe portal-orbe-1"></span>
+      <span class="portal-orbe portal-orbe-2"></span>
+      <span class="portal-orbe portal-orbe-3"></span>
+      <span class="portal-traco portal-traco-1"></span>
+      <span class="portal-traco portal-traco-2"></span>
+    </div>
+
+    <div class="portal-painel">
+      <div class="portal-marcas">
+        <div class="portal-logo-box">
+          <img src="Logos/Eldorado.png" alt="Eldorado Distribuição" />
+        </div>
+
+        <span class="portal-divisor"></span>
+
+        <div class="portal-logo-box portal-logo-ternura">
+          <img src="Logos/Produtos-ternura.png" alt="Produtos Ternura" />
+        </div>
+      </div>
+
+      <div id="portalEscolha" class="portal-etapa ativo">
+        <div class="portal-intro">
+          <span class="portal-kicker">CATÁLOGO DIGITAL</span>
+          <h1>Bem-vindo ao Catálogo Eldorado</h1>
+          <p>Escolha como deseja acessar para continuar.</p>
+        </div>
+
+        <div class="portal-opcoes">
+          <button id="btnAcessoCliente" class="portal-card portal-card-cliente" type="button">
+            <span class="portal-card-icone">👥</span>
+            <span class="portal-card-conteudo">
+              <small>ACESSO RÁPIDO</small>
+              <strong>Área do Cliente</strong>
+              <em>Consulte nosso catálogo de produtos</em>
+            </span>
+            <span class="portal-card-seta">→</span>
+          </button>
+
+          <button id="btnAcessoAdministrador" class="portal-card portal-card-admin" type="button">
+            <span class="portal-card-icone">◆</span>
+            <span class="portal-card-conteudo">
+              <small>ACESSO RESTRITO</small>
+              <strong>Área do Administrador</strong>
+              <em>Recursos e informações administrativas</em>
+            </span>
+            <span class="portal-card-seta">→</span>
+          </button>
+        </div>
+
+        <div class="portal-beneficios">
+          <span>✓ Catálogo atualizado</span>
+          <span>✓ Acesso rápido</span>
+          <span>✓ Navegação responsiva</span>
+        </div>
+      </div>
+
+      <div id="portalLoginAdmin" class="portal-etapa portal-login-admin">
+        <button id="btnVoltarEscolhaAcesso" class="portal-voltar" type="button">← Voltar</button>
+
+        <div class="portal-intro portal-intro-login">
+          <span class="portal-kicker">ACESSO ADMINISTRATIVO</span>
+          <h2>Área do Administrador</h2>
+          <p>Informe suas credenciais para continuar.</p>
+        </div>
+
+        <form id="formLoginAdministrador" class="portal-form" autocomplete="off">
+          <label for="usuarioAdministrador">Usuário</label>
+          <input
+            id="usuarioAdministrador"
+            type="text"
+            placeholder="Digite o usuário"
+            autocomplete="username"
+            required
+          />
+
+          <label for="senhaAdministrador">Senha</label>
+          <div class="portal-senha-wrap">
+            <input
+              id="senhaAdministrador"
+              type="password"
+              placeholder="Digite a senha"
+              autocomplete="current-password"
+              required
+            />
+            <button id="btnMostrarSenhaAdmin" type="button" aria-label="Mostrar ou ocultar senha">◉</button>
+          </div>
+
+          <div id="erroLoginAdministrador" class="portal-erro" role="alert"></div>
+
+          <button class="portal-entrar" type="submit">
+            Entrar
+            <span>→</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="portal-rodape">
+        <span>Eldorado Distribuição</span>
+        <span>•</span>
+        <span>Produtos Ternura</span>
+      </div>
+    </div>
+  </section>
+
   <header class="topo">
     <div class="topo-conteudo">
       <button id="btnLogoCatalogo" class="logo-link" type="button" aria-label="Voltar ao Catálogo Eldorado"><img id="logoCatalogo" src="Logos/Eldorado.png" alt="Logo do catálogo" class="logo" /></button>
@@ -21,7 +128,11 @@
           Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização.
         </div>
       </div>
-<button id="btnGerarPdfProdutos" class="pdf-btn" type="button"
+<div id="perfilAcesso" class="perfil-acesso">
+        <span id="perfilAcessoNome">Cliente</span>
+        <button id="btnSairAcesso" type="button" title="Sair do catálogo">Sair</button>
+      </div>
+      <button id="btnGerarPdfProdutos" class="pdf-btn" type="button"
         aria-label="Gerar PDF dos produtos filtrados" title="Gerar PDF">
         <span>PDF</span>
       </button>
@@ -81,9 +192,9 @@
     <section class="filtros-area">
       <div class="busca-area">
         <input type="text" id="buscaPrincipal" placeholder="Buscar por código do produto, descrição ou EAN..." autocomplete="off" />
-        <input type="text" id="buscaCodigoFornecedor" placeholder="Código Fornecedor" autocomplete="off" />
+        <input class="somente-admin campo-codigo-fornecedor" type="text" id="buscaCodigoFornecedor" placeholder="Código Fornecedor" autocomplete="off" />
 
-        <div class="campo-fornecedor">
+        <div class="campo-fornecedor somente-admin">
           <input type="text" id="buscaFornecedor" placeholder="Fornecedor" autocomplete="off" />
           <div id="sugestoesFornecedor" class="sugestoes-fornecedor"></div>
         </div>
