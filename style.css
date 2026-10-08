@@ -3706,3 +3706,240 @@ body.cotacao-v2-aberta {
     grid-column: auto;
   }
 }
+
+
+/* =========================================================
+   COTAÇÃO V2.1 — AJUSTES MOBILE, QUANTIDADE E VISIBILIDADE
+   ========================================================= */
+.cotacao-cliente-toggle-v2 {
+  display: none;
+}
+
+.cotacao-cliente-campos-v2 {
+  display: block;
+}
+
+@media (max-width: 700px) {
+  .cotacao-drawer-v2 {
+    height: min(96dvh, 820px);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  .cotacao-drawer-header-v2 {
+    min-height: 58px;
+    padding: 9px 11px;
+    align-items: center;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .cotacao-titulo-bloco-v2 {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto auto;
+    align-items: center;
+    column-gap: 7px;
+    row-gap: 1px;
+  }
+
+  .cotacao-kicker-v2 {
+    display: none;
+  }
+
+  .cotacao-drawer-header-v2 h2 {
+    font-size: 16px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .cotacao-drawer-header-v2 p {
+    margin: 0;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cotacao-header-acoes-v2 {
+    gap: 5px;
+  }
+
+  .cotacao-header-acoes-v2 button {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+
+  .cotacao-cliente-v2 {
+    padding: 0;
+    border-bottom: 1px solid #e6ebe8;
+    background: #fff;
+  }
+
+  .cotacao-cliente-toggle-v2 {
+    width: 100%;
+    min-height: 42px;
+    padding: 7px 11px;
+    border: 0;
+    background: #fff;
+    color: #2d493b;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    text-align: left;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .cotacao-cliente-toggle-v2 > span {
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .cotacao-cliente-toggle-v2 > small {
+    grid-column: 1;
+    font-size: 8.5px;
+    color: #7d8982;
+  }
+
+  .cotacao-cliente-toggle-v2 > b {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    font-size: 15px;
+    color: var(--cor-principal);
+  }
+
+  .cotacao-cliente-campos-v2 {
+    padding: 2px 11px 9px;
+  }
+
+  .cotacao-cliente-v2.recolhido-mobile .cotacao-cliente-campos-v2 {
+    display: none;
+  }
+
+  .cotacao-cliente-campos-v2 label {
+    margin: 6px 0 4px;
+    font-size: 9px;
+  }
+
+  .cotacao-cliente-campos-v2 input {
+    height: 36px;
+    border-radius: 9px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .cotacao-lista-v2 {
+    padding: 8px 8px 5px;
+  }
+
+  .cotacao-item-v2 {
+    margin-bottom: 8px;
+    padding: 9px 9px 8px;
+    border-radius: 12px;
+  }
+
+  .cotacao-item-topo-v2 {
+    gap: 6px;
+  }
+
+  .cotacao-item-v2 .cotacao-codigo-v2 {
+    font-size: 10px;
+  }
+
+  .cotacao-item-v2 .cotacao-descricao-v2 {
+    font-size: 12.5px;
+    line-height: 1.24;
+    min-height: auto;
+    padding-right: 2px;
+  }
+
+  .cotacao-remover-v2 {
+    width: 29px;
+    height: 29px;
+  }
+
+  .cotacao-dados-grid-v2 {
+    margin-top: 7px;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 3px 8px;
+    font-size: 9.2px;
+  }
+
+  .cotacao-quantidade-area-v2 {
+    margin-top: 7px;
+    padding-top: 7px;
+    grid-template-columns: minmax(0,1fr) auto;
+    gap: 6px;
+  }
+
+  .cotacao-quantidade-area-v2 > label {
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  .cotacao-stepper-v2 {
+    justify-self: end;
+    grid-template-columns: 31px 58px 31px;
+    gap: 4px;
+  }
+
+  .cotacao-stepper-v2 button,
+  .cotacao-stepper-v2 input {
+    height: 31px;
+  }
+
+  .cotacao-stepper-v2 input {
+    width: 58px;
+    font-size: 11px;
+  }
+
+  .cotacao-observacao-v2 {
+    margin-top: 7px;
+  }
+
+  .cotacao-observacao-v2 textarea {
+    min-height: 40px;
+    max-height: 78px;
+    font-size: 10px;
+  }
+
+  .cotacao-aviso-estoque-v2 {
+    margin-top: 6px;
+    padding: 6px 7px;
+    font-size: 9px;
+  }
+
+  .cotacao-drawer-footer-v2 {
+    padding: 6px 8px calc(7px + env(safe-area-inset-bottom));
+  }
+
+  .cotacao-resumo-final-v2 {
+    margin-bottom: 5px;
+    padding: 0 2px;
+    font-size: 9px;
+  }
+
+  .cotacao-resumo-final-v2 strong {
+    font-size: 11px;
+  }
+
+  .cotacao-acoes-v2 {
+    grid-template-columns: 1fr 1.25fr .72fr;
+    gap: 5px;
+  }
+
+  .cotacao-acoes-v2 .cotacao-acao-perigo-v2 {
+    grid-column: auto;
+  }
+
+  .cotacao-acao-principal-v2,
+  .cotacao-acao-secundaria-v2,
+  .cotacao-acao-perigo-v2 {
+    min-height: 36px;
+    padding: 0 6px;
+    border-radius: 9px;
+    font-size: 9px;
+    line-height: 1.08;
+  }
+}

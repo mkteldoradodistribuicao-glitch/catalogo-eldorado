@@ -275,6 +275,7 @@ async function carregarProdutos() {
       .map(linha => criarProdutoAPartirDaLinha(linha, estrutura.indices))
       .filter(produto => produto.codigo || produto.descricao || produto.ean);
 
+    sincronizarDadosCotacaoComProdutos();
     marcarNovidades();
     carregarFavoritos();
     aplicarFiltros();
@@ -1165,6 +1166,7 @@ function criarItemCotacao(produto) {
     descricao: String(produto.descricao || "").trim(),
     ean: String(produto.ean || "").trim(),
     embalagem: String(produto.embalagem || "").trim(),
+    imagem: String(produto.imagem || "").trim(),
     qtdMaster: master,
     estoque: numeroSeguro(produto.estoque),
     codigoFornecedor: usuarioEhAdministrador()
@@ -1176,6 +1178,55 @@ function criarItemCotacao(produto) {
     quantidade: master,
     observacao: ""
   };
+}
+
+function sincronizarDadosCotacaoComProdutos() {
+  if (!Array.isArray(produtos) || !produtos.length || !Array.isArray(cotacao) || !cotacao.length) {
+    return;
+  }
+
+  const mapa = new Map(
+    produtos.map(produto => [String(produto.codigo || "").trim(), produto])
+  );
+
+  let alterou = false;
+
+  cotacao = cotacao.map(item => {
+    const produto = mapa.get(String(item.codigo || "").trim());
+    if (!produto) return item;
+
+    const atualizado = {
+      ...item,
+      descricao: String(produto.descricao || item.descricao || "").trim(),
+      ean: String(produto.ean || item.ean || "").trim(),
+      embalagem: String(produto.embalagem || item.embalagem || "").trim(),
+      imagem: String(produto.imagem || item.imagem || "").trim(),
+      qtdMaster: obterMasterProduto(produto),
+      estoque: numeroSeguro(produto.estoque),
+      codigoFornecedor: usuarioEhAdministrador()
+        ? String(produto.codigoFornecedor || item.codigoFornecedor || "").trim()
+        : "",
+      fornecedor: usuarioEhAdministrador()
+        ? String(produto.fornecedor || item.fornecedor || "").trim()
+        : ""
+    };
+
+    atualizado.quantidade = normalizarQuantidadeMaster(
+      item.quantidade,
+      atualizado.qtdMaster
+    );
+
+    if (JSON.stringify(atualizado) !== JSON.stringify(item)) {
+      alterou = true;
+    }
+
+    return atualizado;
+  });
+
+  if (alterou) {
+    salvarCotacaoAtual();
+    atualizarCotacaoV2();
+  }
 }
 
 function carregarCotacaoDoPerfil() {
@@ -1302,7 +1353,7 @@ function alterarQuantidadeCotacao(codigo, novaQuantidade) {
   );
 
   salvarCotacaoAtual();
-  atualizarCotacaoV2(false);
+  atualizarCotacaoV2(true, true);
 }
 
 function alterarObservacaoCotacao(codigo, observacao) {
@@ -1347,9 +1398,11 @@ function mensagemEstoqueCotacao(item) {
   return null;
 }
 
-function renderizarListaCotacaoV2() {
+function renderizarListaCotacaoV2(preservarScroll = false) {
   const lista = document.getElementById("listaCotacaoV2");
   if (!lista) return;
+
+  const scrollAnterior = preservarScroll ? lista.scrollTop : 0;
 
   if (!cotacao.length) {
     lista.innerHTML = `
@@ -1449,6 +1502,12 @@ function renderizarListaCotacaoV2() {
       alterarObservacaoCotacao(codigo, event.target.value);
     });
   });
+
+  if (preservarScroll) {
+    requestAnimationFrame(() => {
+      lista.scrollTop = scrollAnterior;
+    });
+  }
 }
 
 function atualizarEstadoBotoesCotacaoV2() {
@@ -1465,7 +1524,7 @@ function atualizarEstadoBotoesCotacaoV2() {
   });
 }
 
-function atualizarCotacaoV2(renderizarLista = true) {
+function atualizarCotacaoV2(renderizarLista = true, preservarScroll = false) {
   const quantidadeItens = cotacao.length;
   const textoResumo = quantidadeItens
     ? `${quantidadeItens} produto${quantidadeItens === 1 ? "" : "s"} na cotação`
@@ -1496,7 +1555,7 @@ function atualizarCotacaoV2(renderizarLista = true) {
   }
 
   if (renderizarLista) {
-    renderizarListaCotacaoV2();
+    renderizarListaCotacaoV2(preservarScroll);
   }
 
   atualizarEstadoBotoesCotacaoV2();
@@ -1599,12 +1658,14 @@ function validarDadosPdfCotacaoV2() {
   }
 
   if (!dadosCotacao.cliente) {
+    expandirDadosClienteCotacaoV2();
     alert("Informe a Razão Social da loja ou o Comprador responsável.");
     document.getElementById("cotacaoClienteNomeV2")?.focus();
     return false;
   }
 
   if (!cnpjPreenchidoCotacaoV2(dadosCotacao.cnpj)) {
+    expandirDadosClienteCotacaoV2();
     alert("Informe o CNPJ com 14 dígitos.");
     document.getElementById("cotacaoCnpjV2")?.focus();
     return false;
@@ -1614,50 +1675,46 @@ function validarDadosPdfCotacaoV2() {
 }
 
 function textoCotacaoParaCopiarV2() {
-  const linhas = [];
+  const dataAtual = new Date().toLocaleDateString("pt-BR");
+  const produtosDistintos = cotacao.length;
+  const totalItens = cotacao.reduce(
+    (total, item) => total + Math.max(0, Number(item.quantidade) || 0),
+    0
+  );
 
-  if (dadosCotacao.cliente) {
-    linhas.push(`Cliente/Comprador: ${dadosCotacao.cliente}`);
-  }
+  const linhas = [
+    "SOLICITAÇÃO DE COTAÇÃO",
+    "",
+    `Razão Social/Comprador: ${dadosCotacao.cliente || "-"}`,
+    `CNPJ: ${dadosCotacao.cnpj || "-"}`,
+    `Data: ${dataAtual}`,
+    `Produtos distintos: ${produtosDistintos}`,
+    `Total de itens solicitados: ${totalItens}`,
+    "",
+    "Código | Descrição | EAN | Quantidade",
+    ""
+  ];
 
-  if (dadosCotacao.cnpj) {
-    linhas.push(`CNPJ: ${dadosCotacao.cnpj}`);
-  }
+  cotacao.forEach(item => {
+    linhas.push(
+      `${item.codigo || "-"} | ${item.descricao || "-"} | ${item.ean || "-"} | ${item.quantidade || 0}`
+    );
 
-  if (linhas.length) {
-    linhas.push("");
-  }
-
-  cotacao.forEach((item, indice) => {
-    linhas.push(`${indice + 1}. ${item.codigo} - ${item.descricao}`);
-    linhas.push(`EAN: ${item.ean || "-"}`);
-    linhas.push(`Embalagem: ${item.embalagem || "-"}`);
-    linhas.push(`QTD Master: ${item.qtdMaster || 1}`);
-
-    if (usuarioEhAdministrador()) {
-      linhas.push(`Código Fornecedor: ${item.codigoFornecedor || "-"}`);
-      linhas.push(`Fornecedor: ${item.fornecedor || "-"}`);
+    if (String(item.observacao || "").trim()) {
+      linhas.push(`Observação: ${String(item.observacao).trim()}`);
     }
-
-    linhas.push(`Quantidade desejada: ${item.quantidade}`);
-
-    if (item.observacao) {
-      linhas.push(`Observação: ${item.observacao}`);
-    }
-
-    linhas.push("");
   });
 
-  return linhas.join("\n").trim();
+  linhas.push(
+    "",
+    "Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização."
+  );
+
+  return linhas.join("\n");
 }
 
 async function copiarCotacaoV2() {
-  if (!cotacao.length) {
-    mostrarToast("Adicione produtos à cotação.");
-    return;
-  }
-
-  capturarDadosCotacaoV2();
+  if (!validarDadosPdfCotacaoV2()) return;
 
   const texto = textoCotacaoParaCopiarV2();
 
@@ -1692,116 +1749,177 @@ function nomeArquivoCotacaoV2() {
 async function gerarPdfCotacaoV2() {
   if (!validarDadosPdfCotacaoV2()) return;
 
-  if (!window.jspdf?.jsPDF) {
+  if (!window.jspdf?.jsPDF || typeof window.jspdf.jsPDF !== "function") {
     alert("Não foi possível carregar o gerador de PDF.");
     return;
   }
 
+  if (typeof window.jspdf.jsPDF.API.autoTable !== "function") {
+    alert("Não foi possível carregar o recurso de tabela do PDF.");
+    return;
+  }
+
+  mostrarToast("Preparando PDF da cotação...");
+
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF("p", "mm", "a4");
-  const largura = doc.internal.pageSize.getWidth();
+  const larguraPagina = doc.internal.pageSize.getWidth();
+  const alturaPagina = doc.internal.pageSize.getHeight();
+  const dataAtual = new Date().toLocaleDateString("pt-BR");
+  const produtosDistintos = cotacao.length;
+  const totalItens = cotacao.reduce(
+    (total, item) => total + Math.max(0, Number(item.quantidade) || 0),
+    0
+  );
 
-  doc.setFillColor(0, 103, 56);
-  doc.rect(0, 0, largura, 28, "F");
+  const [logoPdf, ...imagensPdf] = await Promise.all([
+    carregarImagemProdutoParaPdf("Logos/Eldorado.png", false),
+    ...cotacao.map(item =>
+      carregarImagemProdutoParaPdf(
+        item.imagem ? `Imagens/${item.imagem}` : "",
+        true
+      )
+    )
+  ]);
 
-  doc.setFillColor(255, 107, 26);
-  doc.rect(0, 25.5, largura, 2.5, "F");
+  if (logoPdf?.dataUrl) {
+    try {
+      const maxW = 31;
+      const maxH = 15;
+      const proporcao = logoPdf.largura / Math.max(1, logoPdf.altura);
+      let w = maxW;
+      let h = w / proporcao;
+      if (h > maxH) {
+        h = maxH;
+        w = h * proporcao;
+      }
+      doc.addImage(logoPdf.dataUrl, logoPdf.formato, 11, 8, w, h);
+    } catch {}
+  }
 
-  doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  doc.text("COTAÇÃO ELDORADO", 14, 13);
+  doc.setTextColor(25, 32, 28);
+  doc.setFontSize(16);
+  doc.text("SOLICITAÇÃO DE COTAÇÃO", 11, 30);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.text("Catálogo ilustrativo • Sujeito à disponibilidade e condições comerciais", 14, 20);
+  doc.setFontSize(7.8);
+  doc.setTextColor(55, 62, 58);
 
-  doc.setTextColor(40, 48, 44);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("DADOS DO CLIENTE", 14, 36);
+  let yInfo = 38;
+  const info = [
+    `Razão Social/Comprador: ${dadosCotacao.cliente}`,
+    `CNPJ: ${dadosCotacao.cnpj}`,
+    `Data: ${dataAtual}`,
+    `Produtos distintos: ${produtosDistintos}`,
+    `Total de itens solicitados: ${totalItens}`
+  ];
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.2);
-  doc.text(`Razão Social / Comprador: ${dadosCotacao.cliente}`, 14, 42, { maxWidth: 182 });
-  doc.text(`CNPJ: ${dadosCotacao.cnpj}`, 14, 47);
-  doc.text(`Data: ${new Date().toLocaleDateString("pt-BR")}`, 150, 47);
-
-  const head = usuarioEhAdministrador()
-    ? [["Código", "Descrição", "EAN", "Emb.", "Master", "Fornecedor", "Qtd.", "Observação"]]
-    : [["Código", "Descrição", "EAN", "Emb.", "Master", "Qtd.", "Observação"]];
-
-  const body = cotacao.map(item => {
-    const base = [
-      item.codigo || "",
-      item.descricao || "",
-      item.ean || "",
-      item.embalagem || "",
-      item.qtdMaster || 1
-    ];
-
-    if (usuarioEhAdministrador()) {
-      base.push(
-        [item.codigoFornecedor, item.fornecedor].filter(Boolean).join(" • ")
-      );
-    }
-
-    base.push(item.quantidade || "");
-    base.push(item.observacao || "");
-    return base;
+  info.forEach(linha => {
+    doc.text(linha, 11, yInfo, { maxWidth: 188 });
+    yInfo += 5;
   });
 
+  const body = cotacao.map(item => [
+    "",
+    item.codigo || "-",
+    String(item.observacao || "").trim()
+      ? `${item.descricao || "-"}\nObs.: ${String(item.observacao).trim()}`
+      : (item.descricao || "-"),
+    item.ean || "-",
+    String(item.quantidade || 0)
+  ]);
+
   doc.autoTable({
-    startY: 53,
-    head,
+    startY: yInfo + 4,
+    head: [["Imagem", "Código", "Descrição", "EAN", "Quantidade"]],
     body,
-    theme: "grid",
+    theme: "striped",
+    showHead: "everyPage",
+    margin: { left: 11, right: 11, top: 14, bottom: 17 },
+    tableWidth: "auto",
     styles: {
-      fontSize: 6.4,
-      cellPadding: 1.4,
+      font: "helvetica",
+      fontSize: 6.5,
+      cellPadding: { top: 1.4, right: 1.4, bottom: 1.4, left: 1.4 },
       valign: "middle",
-      lineColor: [224, 230, 226],
-      lineWidth: 0.15,
-      overflow: "linebreak"
+      textColor: [72, 77, 74],
+      minCellHeight: 10,
+      overflow: "linebreak",
+      lineWidth: 0
     },
     headStyles: {
-      fillColor: [0, 103, 56],
+      fillColor: [0, 153, 61],
       textColor: [255, 255, 255],
       fontStyle: "bold",
-      halign: "center"
+      halign: "left",
+      minCellHeight: 7
     },
     alternateRowStyles: {
-      fillColor: [247, 250, 248]
+      fillColor: [242, 243, 242]
     },
-    margin: {
-      left: 8,
-      right: 8,
-      bottom: 14
+    columnStyles: {
+      0: { cellWidth: 14, halign: "center" },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 84 },
+      3: { cellWidth: 42 },
+      4: { cellWidth: 24, halign: "center" }
     },
-    didDrawPage: () => {
-      const altura = doc.internal.pageSize.getHeight();
+    didDrawCell: data => {
+      if (data.section !== "body" || data.column.index !== 0) return;
 
-      doc.setDrawColor(224, 230, 226);
-      doc.line(8, altura - 10, largura - 8, altura - 10);
+      const imagem = imagensPdf[data.row.index];
+      if (!imagem?.dataUrl) return;
+
+      try {
+        const margem = 1;
+        const maxW = Math.max(1, data.cell.width - margem * 2);
+        const maxH = Math.max(1, data.cell.height - margem * 2);
+        const proporcao = imagem.largura / Math.max(1, imagem.altura);
+        let w = maxW;
+        let h = w / proporcao;
+
+        if (h > maxH) {
+          h = maxH;
+          w = h * proporcao;
+        }
+
+        const x = data.cell.x + (data.cell.width - w) / 2;
+        const y = data.cell.y + (data.cell.height - h) / 2;
+
+        doc.addImage(imagem.dataUrl, imagem.formato, x, y, w, h);
+      } catch {}
+    },
+    didDrawPage: data => {
+      const pagina = doc.internal.getNumberOfPages();
+
+      if (pagina > 1) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.2);
+        doc.setTextColor(40, 50, 44);
+        doc.text("SOLICITAÇÃO DE COTAÇÃO", 11, 9);
+      }
+
+      doc.setDrawColor(222, 226, 223);
+      doc.line(11, alturaPagina - 12, larguraPagina - 11, alturaPagina - 12);
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.3);
-      doc.setTextColor(95, 103, 99);
+      doc.setFontSize(5.8);
+      doc.setTextColor(73, 78, 75);
       doc.text(
-        "Esta cotação não caracteriza Pedido de Compra. Confirme disponibilidade, preços e condições com o RCA.",
-        8,
-        altura - 5
+        "Catálogo ilustrativo. Não caracteriza Pedido de Compra. A disponibilidade, preços e condições comerciais devem ser confirmados com o RCA antes da finalização.",
+        11,
+        alturaPagina - 7,
+        { maxWidth: larguraPagina - 40 }
       );
 
       doc.setFont("helvetica", "bold");
       doc.text(
-        `Página ${doc.internal.getNumberOfPages()}`,
-        largura - 8,
-        altura - 5,
+        `Página ${pagina}`,
+        larguraPagina - 11,
+        alturaPagina - 7,
         { align: "right" }
       );
-
-      doc.setTextColor(0, 0, 0);
     }
   });
 
@@ -1944,7 +2062,38 @@ function fecharModalPosCotacaoV2() {
   document.getElementById("modalPosCotacaoV2")?.setAttribute("aria-hidden", "true");
 }
 
+function atualizarEstadoDadosClienteCotacaoV2() {
+  const area = document.getElementById("cotacaoClienteV2");
+  const botao = document.getElementById("btnToggleDadosCotacaoV2");
+  if (!area || !botao) return;
+
+  const recolhido = area.classList.contains("recolhido-mobile");
+  botao.setAttribute("aria-expanded", recolhido ? "false" : "true");
+  const seta = botao.querySelector("b");
+  if (seta) seta.textContent = recolhido ? "⌄" : "⌃";
+}
+
+function expandirDadosClienteCotacaoV2() {
+  const area = document.getElementById("cotacaoClienteV2");
+  area?.classList.remove("recolhido-mobile");
+  atualizarEstadoDadosClienteCotacaoV2();
+}
+
+function alternarDadosClienteCotacaoV2() {
+  const area = document.getElementById("cotacaoClienteV2");
+  if (!area) return;
+  area.classList.toggle("recolhido-mobile");
+  atualizarEstadoDadosClienteCotacaoV2();
+}
+
 function configurarCotacaoV2() {
+  const areaClienteCotacao = document.getElementById("cotacaoClienteV2");
+  if (areaClienteCotacao && window.matchMedia("(max-width: 700px)").matches) {
+    areaClienteCotacao.classList.add("recolhido-mobile");
+  }
+  atualizarEstadoDadosClienteCotacaoV2();
+
+  document.getElementById("btnToggleDadosCotacaoV2")?.addEventListener("click", alternarDadosClienteCotacaoV2);
   document.getElementById("btnCotacaoTopo")?.addEventListener("click", abrirCotacaoV2);
   document.getElementById("btnCotacaoFlutuanteV2")?.addEventListener("click", abrirCotacaoV2);
   document.getElementById("btnFecharCotacaoV2")?.addEventListener("click", fecharCotacaoV2);
