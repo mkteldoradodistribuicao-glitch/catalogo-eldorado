@@ -3943,3 +3943,91 @@ body.cotacao-v2-aberta {
     line-height: 1.08;
   }
 }
+
+/* =========================================================
+   AJUSTE FINAL MOBILE — PERFIL / CARRINHO / PDF SEM SOBREPOSIÇÃO
+   ========================================================= */
+@media (max-width: 700px) {
+  .topo-conteudo {
+    position: relative;
+    padding-top: 54px;
+  }
+
+  .menu-btn {
+    top: 0;
+    left: 0;
+    right: auto;
+    z-index: 8;
+  }
+
+  .perfil-acesso {
+    position: absolute;
+    top: 0;
+    right: 108px;
+    width: 76px;
+    min-width: 76px;
+    height: 44px;
+    min-height: 44px;
+    padding: 4px 6px;
+    z-index: 8;
+  }
+
+  .perfil-acesso span {
+    max-width: 64px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 8px;
+  }
+
+  .perfil-acesso button {
+    font-size: 8px;
+  }
+
+  .cotacao-topo-v2 {
+    top: 0;
+    right: 54px;
+    width: 44px;
+    height: 44px;
+    z-index: 9;
+  }
+
+  .pdf-btn {
+    top: 0;
+    right: 0;
+    width: 44px;
+    height: 44px;
+    z-index: 8;
+  }
+
+  .cotacao-contador-v2 {
+    top: -6px;
+    right: -6px;
+  }
+}
+
+@media (max-width: 390px) {
+  .perfil-acesso {
+    right: 104px;
+    width: 70px;
+    min-width: 70px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .perfil-acesso span {
+    max-width: 58px;
+    font-size: 7.5px;
+  }
+
+  .cotacao-topo-v2 {
+    right: 52px;
+  }
+
+  .pdf-btn,
+  .cotacao-topo-v2,
+  .menu-btn {
+    width: 42px;
+    height: 42px;
+  }
+}
