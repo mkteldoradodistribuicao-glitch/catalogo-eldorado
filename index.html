@@ -132,6 +132,12 @@
         <span id="perfilAcessoNome">Cliente</span>
         <button id="btnSairAcesso" type="button" title="Sair do catálogo">Sair</button>
       </div>
+      <button id="btnCotacaoTopo" class="cotacao-topo-v2" type="button"
+        aria-label="Abrir cotação" title="Abrir cotação">
+        <span class="cotacao-topo-icone">🛒</span>
+        <span id="contadorCotacaoTopo" class="cotacao-contador-v2">0</span>
+      </button>
+
       <button id="btnGerarPdfProdutos" class="pdf-btn" type="button"
         aria-label="Gerar PDF dos produtos filtrados" title="Gerar PDF">
         <span>PDF</span>
@@ -185,6 +191,7 @@
       <button id="btnNovidades" type="button">Novidades</button>
       <button id="btnFavoritos" type="button">⭐ Favoritos</button>
       <button id="btnScanner" type="button">📷 Scanner EAN</button>
+      <button id="btnHistoricoCotacoes" type="button">🧾 Histórico de Cotações</button>
     </nav>
   </header>
 
@@ -231,6 +238,94 @@
     <section id="catalogo"></section>
     <div id="paginacao" class="paginacao"></div>
   </main>
+
+  <div id="overlayCotacaoV2" class="cotacao-overlay-v2" aria-hidden="true"></div>
+
+  <aside id="painelCotacaoV2" class="cotacao-drawer-v2" aria-hidden="true" aria-label="Carrinho de cotação">
+    <div class="cotacao-drawer-header-v2">
+      <div>
+        <span class="cotacao-kicker-v2">COTAÇÃO</span>
+        <h2>Produtos selecionados</h2>
+        <p id="resumoCotacaoV2">Nenhum produto adicionado</p>
+      </div>
+
+      <div class="cotacao-header-acoes-v2">
+        <button id="btnAbrirHistoricoCotacaoV2" type="button" title="Histórico de cotações">🧾</button>
+        <button id="btnFecharCotacaoV2" type="button" title="Fechar cotação">×</button>
+      </div>
+    </div>
+
+    <div class="cotacao-cliente-v2">
+      <label for="cotacaoClienteNomeV2">
+        Razão Social da loja ou Comprador responsável
+        <span>*</span>
+      </label>
+      <input id="cotacaoClienteNomeV2" type="text" autocomplete="organization"
+        placeholder="Informe a Razão Social ou o nome do comprador" />
+
+      <label for="cotacaoCnpjV2">
+        CNPJ
+        <span>*</span>
+      </label>
+      <input id="cotacaoCnpjV2" type="text" inputmode="numeric" maxlength="18"
+        placeholder="00.000.000/0000-00" />
+    </div>
+
+    <div id="listaCotacaoV2" class="cotacao-lista-v2"></div>
+
+    <div class="cotacao-drawer-footer-v2">
+      <div class="cotacao-resumo-final-v2">
+        <span>Itens</span>
+        <strong id="totalItensCotacaoV2">0</strong>
+      </div>
+
+      <div class="cotacao-acoes-v2">
+        <button id="btnCopiarCotacaoV2" class="cotacao-acao-secundaria-v2" type="button">
+          Copiar cotação
+        </button>
+
+        <button id="btnGerarPdfCotacaoV2" class="cotacao-acao-principal-v2" type="button">
+          Gerar Cotação em PDF
+        </button>
+
+        <button id="btnLimparCotacaoV2" class="cotacao-acao-perigo-v2" type="button">
+          Limpar carrinho
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="modalHistoricoCotacoesV2" class="cotacao-modal-v2" aria-hidden="true">
+    <div class="cotacao-modal-card-v2 cotacao-historico-card-v2">
+      <div class="cotacao-modal-header-v2">
+        <div>
+          <span class="cotacao-kicker-v2">HISTÓRICO</span>
+          <h3>Cotações finalizadas</h3>
+        </div>
+        <button id="btnFecharHistoricoCotacoesV2" type="button">×</button>
+      </div>
+
+      <div id="listaHistoricoCotacoesV2" class="cotacao-historico-lista-v2"></div>
+    </div>
+  </div>
+
+  <div id="modalPosCotacaoV2" class="cotacao-modal-v2" aria-hidden="true">
+    <div class="cotacao-modal-card-v2 cotacao-pos-card-v2">
+      <span class="cotacao-kicker-v2">COTAÇÃO CONCLUÍDA</span>
+      <h3>O que deseja fazer com o carrinho?</h3>
+      <p>Você pode manter os itens para continuar trabalhando ou limpar a cotação atual.</p>
+
+      <div class="cotacao-pos-acoes-v2">
+        <button id="btnManterCotacaoV2" class="cotacao-acao-secundaria-v2" type="button">
+          Manter itens
+        </button>
+        <button id="btnLimparAposCotacaoV2" class="cotacao-acao-principal-v2" type="button">
+          Limpar carrinho
+        </button>
+      </div>
+    </div>
+  </div>
+
 <div id="modalScanner" class="modal-scanner" aria-hidden="true">
     <div class="scanner-conteudo">
       <div class="scanner-cabecalho">
@@ -286,6 +381,11 @@
   </div>
   <div id="toast" class="toast"></div>
 <div class="botoes-flutuantes">
+<button id="btnCotacaoFlutuanteV2" class="btn-flutuante btn-cotacao-flutuante-v2 visivel"
+  type="button" aria-label="Abrir cotação" title="Abrir cotação">
+  🛒
+  <span id="contadorCotacaoFlutuanteV2" class="cotacao-contador-v2">0</span>
+</button>
 <button id="btnPdfFlutuante" class="btn-flutuante btn-pdf-flutuante"
   type="button" aria-label="Gerar PDF dos produtos filtrados" title="Gerar PDF">PDF</button>
 <button id="btnTopo" class="btn-flutuante btn-topo" type="button" aria-label="Voltar ao topo">↑</button>

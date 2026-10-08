@@ -31,6 +31,20 @@ const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
 const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
 const CHAVE_FAVORITOS = "favoritosCatalogoEldorado";
 
+const CHAVE_COTACAO_CLIENTE = "cotacaoEldoradoClienteV2";
+const CHAVE_COTACAO_ADMIN = "cotacaoEldoradoAdminV2";
+const CHAVE_HISTORICO_COTACAO_CLIENTE = "historicoCotacaoEldoradoClienteV2";
+const CHAVE_HISTORICO_COTACAO_ADMIN = "historicoCotacaoEldoradoAdminV2";
+const LIMITE_HISTORICO_COTACOES = 50;
+
+let cotacao = [];
+let historicoCotacoes = [];
+let dadosCotacao = {
+  cliente: "",
+  cnpj: ""
+};
+
+
 const CONFIG = {
   eldorado: {
     titulo: "Catálogo Eldorado",
@@ -112,6 +126,8 @@ function aplicarPerfilCatalogo(perfil) {
 
 function concluirAcessoCatalogo(perfil) {
   aplicarPerfilCatalogo(perfil);
+  carregarCotacaoDoPerfil();
+  carregarHistoricoCotacoes();
 
   sessionStorage.setItem(CHAVE_SESSAO_ACESSO, perfil);
 
@@ -162,6 +178,9 @@ function validarLoginAdministrador(event) {
 }
 
 function sairDoCatalogo() {
+  fecharCotacaoV2();
+  fecharHistoricoCotacoesV2();
+  fecharModalPosCotacaoV2();
   sessionStorage.removeItem(CHAVE_SESSAO_ACESSO);
   perfilAtual = "nenhum";
   document.body.dataset.perfil = "nenhum";
@@ -185,6 +204,8 @@ function restaurarSessaoAcesso() {
 
   if (perfilSalvo === "cliente" || perfilSalvo === "administrador") {
     aplicarPerfilCatalogo(perfilSalvo);
+    carregarCotacaoDoPerfil();
+    carregarHistoricoCotacoes();
     document.getElementById("portalAcesso")?.classList.add("oculto");
     return;
   }
@@ -979,10 +1000,21 @@ function mostrarProdutos() {
           `
           : ""
       }
+
+      <button class="btn-adicionar-cotacao-v2 ${produtoNaCotacao(produto) ? "no-carrinho" : ""}"
+        type="button" data-codigo="${String(produto.codigo || "").replace(/"/g, "&quot;")}">
+        ${produtoNaCotacao(produto) ? "✓ Na Cotação • Adicionar +1 Master" : "🛒 Adicionar à Cotação"}
+      </button>
     `;
+
+    card.dataset.codigoProduto = String(produto.codigo || "").trim();
 
     card.querySelector(".btn-favorito").addEventListener("click", () => {
       alternarFavorito(produto);
+    });
+
+    card.querySelector(".btn-adicionar-cotacao-v2").addEventListener("click", () => {
+      adicionarProdutoCotacao(produto, card);
     });
 
     catalogo.appendChild(card);
@@ -1093,6 +1125,887 @@ function mostrarToast(mensagem) {
   toastTimer = setTimeout(() => {
     toast.classList.remove("visivel");
   }, 2600);
+}
+
+
+
+function chaveCotacaoAtual() {
+  return usuarioEhAdministrador()
+    ? CHAVE_COTACAO_ADMIN
+    : CHAVE_COTACAO_CLIENTE;
+}
+
+function chaveHistoricoCotacaoAtual() {
+  return usuarioEhAdministrador()
+    ? CHAVE_HISTORICO_COTACAO_ADMIN
+    : CHAVE_HISTORICO_COTACAO_CLIENTE;
+}
+
+function obterMasterProduto(produto) {
+  const master = numeroSeguro(produto?.qtdMaster);
+  return master > 0 ? Math.max(1, Math.round(master)) : 1;
+}
+
+function normalizarQuantidadeMaster(valor, master) {
+  const multiplo = Math.max(1, Number(master) || 1);
+  const quantidade = Math.max(multiplo, Number(valor) || multiplo);
+  return Math.max(multiplo, Math.ceil(quantidade / multiplo) * multiplo);
+}
+
+function produtoNaCotacao(produto) {
+  const codigo = String(produto?.codigo || "").trim();
+  return cotacao.some(item => String(item.codigo || "").trim() === codigo);
+}
+
+function criarItemCotacao(produto) {
+  const master = obterMasterProduto(produto);
+
+  return {
+    codigo: String(produto.codigo || "").trim(),
+    descricao: String(produto.descricao || "").trim(),
+    ean: String(produto.ean || "").trim(),
+    embalagem: String(produto.embalagem || "").trim(),
+    qtdMaster: master,
+    estoque: numeroSeguro(produto.estoque),
+    codigoFornecedor: usuarioEhAdministrador()
+      ? String(produto.codigoFornecedor || "").trim()
+      : "",
+    fornecedor: usuarioEhAdministrador()
+      ? String(produto.fornecedor || "").trim()
+      : "",
+    quantidade: master,
+    observacao: ""
+  };
+}
+
+function carregarCotacaoDoPerfil() {
+  if (perfilAtual !== "cliente" && perfilAtual !== "administrador") {
+    cotacao = [];
+    dadosCotacao = { cliente: "", cnpj: "" };
+    atualizarCotacaoV2();
+    return;
+  }
+
+  try {
+    const salvo = JSON.parse(localStorage.getItem(chaveCotacaoAtual()));
+
+    if (Array.isArray(salvo)) {
+      cotacao = salvo;
+      dadosCotacao = { cliente: "", cnpj: "" };
+    } else {
+      cotacao = Array.isArray(salvo?.itens) ? salvo.itens : [];
+      dadosCotacao = {
+        cliente: String(salvo?.dados?.cliente || ""),
+        cnpj: String(salvo?.dados?.cnpj || "")
+      };
+    }
+  } catch {
+    cotacao = [];
+    dadosCotacao = { cliente: "", cnpj: "" };
+  }
+
+  cotacao = cotacao.map(item => {
+    const master = Math.max(1, numeroSeguro(item.qtdMaster) || 1);
+
+    return {
+      ...item,
+      qtdMaster: master,
+      quantidade: normalizarQuantidadeMaster(item.quantidade, master),
+      observacao: String(item.observacao || ""),
+      codigoFornecedor: usuarioEhAdministrador() ? String(item.codigoFornecedor || "") : "",
+      fornecedor: usuarioEhAdministrador() ? String(item.fornecedor || "") : ""
+    };
+  });
+
+  atualizarCotacaoV2();
+}
+
+function salvarCotacaoAtual() {
+  if (perfilAtual !== "cliente" && perfilAtual !== "administrador") return;
+
+  localStorage.setItem(
+    chaveCotacaoAtual(),
+    JSON.stringify({
+      itens: cotacao,
+      dados: dadosCotacao
+    })
+  );
+}
+
+function carregarHistoricoCotacoes() {
+  if (perfilAtual !== "cliente" && perfilAtual !== "administrador") {
+    historicoCotacoes = [];
+    return;
+  }
+
+  try {
+    const salvo = JSON.parse(localStorage.getItem(chaveHistoricoCotacaoAtual()));
+    historicoCotacoes = Array.isArray(salvo) ? salvo : [];
+  } catch {
+    historicoCotacoes = [];
+  }
+}
+
+function salvarHistoricoCotacoes() {
+  if (perfilAtual !== "cliente" && perfilAtual !== "administrador") return;
+
+  localStorage.setItem(
+    chaveHistoricoCotacaoAtual(),
+    JSON.stringify(historicoCotacoes.slice(0, LIMITE_HISTORICO_COTACOES))
+  );
+}
+
+function adicionarProdutoCotacao(produto, card = null) {
+  const codigo = String(produto.codigo || "").trim();
+  const existente = cotacao.find(item => String(item.codigo || "").trim() === codigo);
+
+  if (existente) {
+    existente.quantidade += obterMasterProduto(existente);
+  } else {
+    cotacao.push(criarItemCotacao(produto));
+  }
+
+  salvarCotacaoAtual();
+  atualizarCotacaoV2();
+
+  if (card) {
+    card.classList.remove("cotacao-adicionada-v2");
+    void card.offsetWidth;
+    card.classList.add("cotacao-adicionada-v2");
+
+    setTimeout(() => {
+      card.classList.remove("cotacao-adicionada-v2");
+    }, 760);
+  }
+
+  animarCarrinhosCotacaoV2();
+  mostrarToast("Produto adicionado à cotação.");
+}
+
+function removerItemCotacao(codigo) {
+  const chave = String(codigo || "").trim();
+  cotacao = cotacao.filter(item => String(item.codigo || "").trim() !== chave);
+  salvarCotacaoAtual();
+  atualizarCotacaoV2();
+}
+
+function alterarQuantidadeCotacao(codigo, novaQuantidade) {
+  const item = cotacao.find(
+    produto => String(produto.codigo || "").trim() === String(codigo || "").trim()
+  );
+
+  if (!item) return;
+
+  item.quantidade = normalizarQuantidadeMaster(
+    novaQuantidade,
+    obterMasterProduto(item)
+  );
+
+  salvarCotacaoAtual();
+  atualizarCotacaoV2(false);
+}
+
+function alterarObservacaoCotacao(codigo, observacao) {
+  const item = cotacao.find(
+    produto => String(produto.codigo || "").trim() === String(codigo || "").trim()
+  );
+
+  if (!item) return;
+
+  item.observacao = String(observacao || "");
+  salvarCotacaoAtual();
+}
+
+function mensagemEstoqueCotacao(item) {
+  const estoque = Math.max(0, numeroSeguro(item.estoque));
+  const master = obterMasterProduto(item);
+  const quantidade = Number(item.quantidade || 0);
+
+  if (estoque <= 0) {
+    return {
+      texto: "Verifique o estoque disponível antes de finalizar.",
+      critico: true
+    };
+  }
+
+  if (quantidade > estoque) {
+    return {
+      texto: "Quantidade acima do estoque informado. Verifique antes de finalizar.",
+      critico: true
+    };
+  }
+
+  const restante = estoque - quantidade;
+
+  if (restante <= master * 3) {
+    return {
+      texto: "Estoque próximo do limite. Verifique antes de finalizar.",
+      critico: false
+    };
+  }
+
+  return null;
+}
+
+function renderizarListaCotacaoV2() {
+  const lista = document.getElementById("listaCotacaoV2");
+  if (!lista) return;
+
+  if (!cotacao.length) {
+    lista.innerHTML = `
+      <div class="cotacao-vazia-v2">
+        <div>
+          <span>🛒</span>
+          <strong>Seu carrinho está vazio.</strong>
+          <p>Adicione produtos do catálogo para montar a cotação.</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  lista.innerHTML = cotacao.map(item => {
+    const aviso = mensagemEstoqueCotacao(item);
+
+    return `
+      <article class="cotacao-item-v2" data-codigo="${escapeHtmlCotacaoV2(item.codigo)}">
+        <div class="cotacao-item-topo-v2">
+          <div>
+            <div class="cotacao-codigo-v2">Código ${escapeHtmlCotacaoV2(item.codigo || "-")}</div>
+            <div class="cotacao-descricao-v2">${escapeHtmlCotacaoV2(item.descricao || "Descrição não informada")}</div>
+          </div>
+
+          <button class="cotacao-remover-v2" type="button"
+            data-acao="remover" aria-label="Remover produto">×</button>
+        </div>
+
+        <div class="cotacao-dados-grid-v2">
+          <span><b>EAN:</b> ${escapeHtmlCotacaoV2(item.ean || "-")}</span>
+          <span><b>Embalagem:</b> ${escapeHtmlCotacaoV2(item.embalagem || "-")}</span>
+          <span><b>QTD Master:</b> ${escapeHtmlCotacaoV2(item.qtdMaster || "1")}</span>
+          <span><b>Estoque:</b> ${formatarNumeroCotacaoV2(item.estoque)}</span>
+          ${
+            usuarioEhAdministrador()
+              ? `
+                <span><b>Cód. Fornecedor:</b> ${escapeHtmlCotacaoV2(item.codigoFornecedor || "-")}</span>
+                <span><b>Fornecedor:</b> ${escapeHtmlCotacaoV2(item.fornecedor || "-")}</span>
+              `
+              : ""
+          }
+        </div>
+
+        <div class="cotacao-quantidade-area-v2">
+          <label>Quantidade desejada • múltiplos de ${escapeHtmlCotacaoV2(item.qtdMaster || 1)}</label>
+
+          <div class="cotacao-stepper-v2">
+            <button type="button" data-acao="menos" aria-label="Diminuir quantidade">−</button>
+            <input type="number" min="${item.qtdMaster}" step="${item.qtdMaster}"
+              value="${item.quantidade}" data-acao="quantidade" />
+            <button type="button" data-acao="mais" aria-label="Aumentar quantidade">+</button>
+          </div>
+        </div>
+
+        <div class="cotacao-observacao-v2">
+          <label>Observação</label>
+          <textarea data-acao="observacao" placeholder="Observação opcional">${escapeHtmlCotacaoV2(item.observacao || "")}</textarea>
+        </div>
+
+        ${
+          aviso
+            ? `<div class="cotacao-aviso-estoque-v2 ${aviso.critico ? "critico" : ""}">${escapeHtmlCotacaoV2(aviso.texto)}</div>`
+            : ""
+        }
+      </article>
+    `;
+  }).join("");
+
+  lista.querySelectorAll(".cotacao-item-v2").forEach(card => {
+    const codigo = card.dataset.codigo;
+    const item = cotacao.find(
+      produto => String(produto.codigo || "").trim() === String(codigo || "").trim()
+    );
+    if (!item) return;
+
+    card.querySelector('[data-acao="remover"]')?.addEventListener("click", () => {
+      removerItemCotacao(codigo);
+    });
+
+    card.querySelector('[data-acao="menos"]')?.addEventListener("click", () => {
+      alterarQuantidadeCotacao(
+        codigo,
+        Math.max(obterMasterProduto(item), item.quantidade - obterMasterProduto(item))
+      );
+    });
+
+    card.querySelector('[data-acao="mais"]')?.addEventListener("click", () => {
+      alterarQuantidadeCotacao(codigo, item.quantidade + obterMasterProduto(item));
+    });
+
+    card.querySelector('[data-acao="quantidade"]')?.addEventListener("change", event => {
+      alterarQuantidadeCotacao(codigo, event.target.value);
+    });
+
+    card.querySelector('[data-acao="observacao"]')?.addEventListener("input", event => {
+      alterarObservacaoCotacao(codigo, event.target.value);
+    });
+  });
+}
+
+function atualizarEstadoBotoesCotacaoV2() {
+  document.querySelectorAll(".btn-adicionar-cotacao-v2").forEach(botao => {
+    const codigo = String(botao.dataset.codigo || "").trim();
+    const presente = cotacao.some(
+      item => String(item.codigo || "").trim() === codigo
+    );
+
+    botao.classList.toggle("no-carrinho", presente);
+    botao.innerHTML = presente
+      ? "✓ Na Cotação • Adicionar +1 Master"
+      : "🛒 Adicionar à Cotação";
+  });
+}
+
+function atualizarCotacaoV2(renderizarLista = true) {
+  const quantidadeItens = cotacao.length;
+  const textoResumo = quantidadeItens
+    ? `${quantidadeItens} produto${quantidadeItens === 1 ? "" : "s"} na cotação`
+    : "Nenhum produto adicionado";
+
+  const resumo = document.getElementById("resumoCotacaoV2");
+  if (resumo) resumo.textContent = textoResumo;
+
+  const total = document.getElementById("totalItensCotacaoV2");
+  if (total) total.textContent = String(quantidadeItens);
+
+  [
+    document.getElementById("contadorCotacaoTopo"),
+    document.getElementById("contadorCotacaoFlutuanteV2")
+  ].forEach(contador => {
+    if (contador) contador.textContent = String(quantidadeItens);
+  });
+
+  const cliente = document.getElementById("cotacaoClienteNomeV2");
+  const cnpj = document.getElementById("cotacaoCnpjV2");
+
+  if (cliente && document.activeElement !== cliente) {
+    cliente.value = dadosCotacao.cliente || "";
+  }
+
+  if (cnpj && document.activeElement !== cnpj) {
+    cnpj.value = dadosCotacao.cnpj || "";
+  }
+
+  if (renderizarLista) {
+    renderizarListaCotacaoV2();
+  }
+
+  atualizarEstadoBotoesCotacaoV2();
+}
+
+function abrirCotacaoV2() {
+  document.getElementById("painelCotacaoV2")?.classList.add("aberto");
+  document.getElementById("painelCotacaoV2")?.setAttribute("aria-hidden", "false");
+  document.getElementById("overlayCotacaoV2")?.classList.add("aberto");
+  document.getElementById("overlayCotacaoV2")?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("cotacao-v2-aberta");
+  atualizarCotacaoV2();
+}
+
+function fecharCotacaoV2() {
+  document.getElementById("painelCotacaoV2")?.classList.remove("aberto");
+  document.getElementById("painelCotacaoV2")?.setAttribute("aria-hidden", "true");
+  document.getElementById("overlayCotacaoV2")?.classList.remove("aberto");
+  document.getElementById("overlayCotacaoV2")?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("cotacao-v2-aberta");
+}
+
+function limparCotacaoV2(confirmar = true) {
+  if (confirmar && cotacao.length) {
+    const ok = window.confirm("Deseja limpar todos os itens da cotação?");
+    if (!ok) return;
+  }
+
+  cotacao = [];
+  dadosCotacao = { cliente: "", cnpj: "" };
+  salvarCotacaoAtual();
+  atualizarCotacaoV2();
+  mostrarToast("Carrinho limpo.");
+}
+
+function animarCarrinhosCotacaoV2() {
+  [
+    document.getElementById("btnCotacaoTopo"),
+    document.getElementById("btnCotacaoFlutuanteV2")
+  ].forEach(botao => {
+    if (!botao) return;
+    botao.classList.remove("pulso");
+    void botao.offsetWidth;
+    botao.classList.add("pulso");
+
+    setTimeout(() => {
+      botao.classList.remove("pulso");
+    }, 500);
+  });
+}
+
+function escapeHtmlCotacaoV2(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatarNumeroCotacaoV2(valor) {
+  const numero = numeroSeguro(valor);
+  return Number.isFinite(numero)
+    ? numero.toLocaleString("pt-BR")
+    : "0";
+}
+
+function formatarCnpjCotacaoV2(valor) {
+  const numeros = String(valor || "").replace(/\D/g, "").slice(0, 14);
+
+  return numeros
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+function cnpjPreenchidoCotacaoV2(valor) {
+  return String(valor || "").replace(/\D/g, "").length === 14;
+}
+
+function capturarDadosCotacaoV2() {
+  dadosCotacao.cliente = String(
+    document.getElementById("cotacaoClienteNomeV2")?.value || ""
+  ).trim();
+
+  dadosCotacao.cnpj = String(
+    document.getElementById("cotacaoCnpjV2")?.value || ""
+  ).trim();
+
+  salvarCotacaoAtual();
+}
+
+function validarDadosPdfCotacaoV2() {
+  capturarDadosCotacaoV2();
+
+  if (!cotacao.length) {
+    mostrarToast("Adicione produtos à cotação.");
+    return false;
+  }
+
+  if (!dadosCotacao.cliente) {
+    alert("Informe a Razão Social da loja ou o Comprador responsável.");
+    document.getElementById("cotacaoClienteNomeV2")?.focus();
+    return false;
+  }
+
+  if (!cnpjPreenchidoCotacaoV2(dadosCotacao.cnpj)) {
+    alert("Informe o CNPJ com 14 dígitos.");
+    document.getElementById("cotacaoCnpjV2")?.focus();
+    return false;
+  }
+
+  return true;
+}
+
+function textoCotacaoParaCopiarV2() {
+  const linhas = [];
+
+  if (dadosCotacao.cliente) {
+    linhas.push(`Cliente/Comprador: ${dadosCotacao.cliente}`);
+  }
+
+  if (dadosCotacao.cnpj) {
+    linhas.push(`CNPJ: ${dadosCotacao.cnpj}`);
+  }
+
+  if (linhas.length) {
+    linhas.push("");
+  }
+
+  cotacao.forEach((item, indice) => {
+    linhas.push(`${indice + 1}. ${item.codigo} - ${item.descricao}`);
+    linhas.push(`EAN: ${item.ean || "-"}`);
+    linhas.push(`Embalagem: ${item.embalagem || "-"}`);
+    linhas.push(`QTD Master: ${item.qtdMaster || 1}`);
+
+    if (usuarioEhAdministrador()) {
+      linhas.push(`Código Fornecedor: ${item.codigoFornecedor || "-"}`);
+      linhas.push(`Fornecedor: ${item.fornecedor || "-"}`);
+    }
+
+    linhas.push(`Quantidade desejada: ${item.quantidade}`);
+
+    if (item.observacao) {
+      linhas.push(`Observação: ${item.observacao}`);
+    }
+
+    linhas.push("");
+  });
+
+  return linhas.join("\n").trim();
+}
+
+async function copiarCotacaoV2() {
+  if (!cotacao.length) {
+    mostrarToast("Adicione produtos à cotação.");
+    return;
+  }
+
+  capturarDadosCotacaoV2();
+
+  const texto = textoCotacaoParaCopiarV2();
+
+  try {
+    await navigator.clipboard.writeText(texto);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = texto;
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+
+  registrarHistoricoCotacaoV2("Cotação copiada");
+  mostrarToast("Cotação copiada.");
+  abrirModalPosCotacaoV2();
+}
+
+function nomeArquivoCotacaoV2() {
+  const base = String(dadosCotacao.cliente || "COTACAO")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 90)
+    .toUpperCase();
+
+  return `${base || "COTACAO"}.pdf`;
+}
+
+async function gerarPdfCotacaoV2() {
+  if (!validarDadosPdfCotacaoV2()) return;
+
+  if (!window.jspdf?.jsPDF) {
+    alert("Não foi possível carregar o gerador de PDF.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("p", "mm", "a4");
+  const largura = doc.internal.pageSize.getWidth();
+
+  doc.setFillColor(0, 103, 56);
+  doc.rect(0, 0, largura, 28, "F");
+
+  doc.setFillColor(255, 107, 26);
+  doc.rect(0, 25.5, largura, 2.5, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(17);
+  doc.text("COTAÇÃO ELDORADO", 14, 13);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.text("Catálogo ilustrativo • Sujeito à disponibilidade e condições comerciais", 14, 20);
+
+  doc.setTextColor(40, 48, 44);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text("DADOS DO CLIENTE", 14, 36);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.2);
+  doc.text(`Razão Social / Comprador: ${dadosCotacao.cliente}`, 14, 42, { maxWidth: 182 });
+  doc.text(`CNPJ: ${dadosCotacao.cnpj}`, 14, 47);
+  doc.text(`Data: ${new Date().toLocaleDateString("pt-BR")}`, 150, 47);
+
+  const head = usuarioEhAdministrador()
+    ? [["Código", "Descrição", "EAN", "Emb.", "Master", "Fornecedor", "Qtd.", "Observação"]]
+    : [["Código", "Descrição", "EAN", "Emb.", "Master", "Qtd.", "Observação"]];
+
+  const body = cotacao.map(item => {
+    const base = [
+      item.codigo || "",
+      item.descricao || "",
+      item.ean || "",
+      item.embalagem || "",
+      item.qtdMaster || 1
+    ];
+
+    if (usuarioEhAdministrador()) {
+      base.push(
+        [item.codigoFornecedor, item.fornecedor].filter(Boolean).join(" • ")
+      );
+    }
+
+    base.push(item.quantidade || "");
+    base.push(item.observacao || "");
+    return base;
+  });
+
+  doc.autoTable({
+    startY: 53,
+    head,
+    body,
+    theme: "grid",
+    styles: {
+      fontSize: 6.4,
+      cellPadding: 1.4,
+      valign: "middle",
+      lineColor: [224, 230, 226],
+      lineWidth: 0.15,
+      overflow: "linebreak"
+    },
+    headStyles: {
+      fillColor: [0, 103, 56],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center"
+    },
+    alternateRowStyles: {
+      fillColor: [247, 250, 248]
+    },
+    margin: {
+      left: 8,
+      right: 8,
+      bottom: 14
+    },
+    didDrawPage: () => {
+      const altura = doc.internal.pageSize.getHeight();
+
+      doc.setDrawColor(224, 230, 226);
+      doc.line(8, altura - 10, largura - 8, altura - 10);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.3);
+      doc.setTextColor(95, 103, 99);
+      doc.text(
+        "Esta cotação não caracteriza Pedido de Compra. Confirme disponibilidade, preços e condições com o RCA.",
+        8,
+        altura - 5
+      );
+
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        `Página ${doc.internal.getNumberOfPages()}`,
+        largura - 8,
+        altura - 5,
+        { align: "right" }
+      );
+
+      doc.setTextColor(0, 0, 0);
+    }
+  });
+
+  doc.save(nomeArquivoCotacaoV2());
+
+  registrarHistoricoCotacaoV2("PDF gerado");
+  mostrarToast("Cotação em PDF gerada.");
+  abrirModalPosCotacaoV2();
+}
+
+function registrarHistoricoCotacaoV2(tipo) {
+  if (!cotacao.length) return;
+
+  capturarDadosCotacaoV2();
+
+  const entrada = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    criadoEm: new Date().toISOString(),
+    tipo: String(tipo || "Cotação"),
+    cliente: dadosCotacao.cliente || "",
+    cnpj: dadosCotacao.cnpj || "",
+    perfil: perfilAtual,
+    itens: cotacao.map(item => ({
+      ...item,
+      codigoFornecedor: usuarioEhAdministrador() ? item.codigoFornecedor : "",
+      fornecedor: usuarioEhAdministrador() ? item.fornecedor : ""
+    }))
+  };
+
+  historicoCotacoes.unshift(entrada);
+  historicoCotacoes = historicoCotacoes.slice(0, LIMITE_HISTORICO_COTACOES);
+  salvarHistoricoCotacoes();
+}
+
+function abrirHistoricoCotacoesV2() {
+  carregarHistoricoCotacoes();
+  renderizarHistoricoCotacoesV2();
+
+  document.getElementById("modalHistoricoCotacoesV2")?.classList.add("aberto");
+  document.getElementById("modalHistoricoCotacoesV2")?.setAttribute("aria-hidden", "false");
+}
+
+function fecharHistoricoCotacoesV2() {
+  document.getElementById("modalHistoricoCotacoesV2")?.classList.remove("aberto");
+  document.getElementById("modalHistoricoCotacoesV2")?.setAttribute("aria-hidden", "true");
+}
+
+function renderizarHistoricoCotacoesV2() {
+  const lista = document.getElementById("listaHistoricoCotacoesV2");
+  if (!lista) return;
+
+  if (!historicoCotacoes.length) {
+    lista.innerHTML = `
+      <div class="cotacao-historico-vazio-v2">
+        <strong>Nenhuma cotação finalizada ainda.</strong>
+        <p>Ao copiar ou gerar um PDF, uma cópia ficará registrada aqui.</p>
+      </div>
+    `;
+    return;
+  }
+
+  lista.innerHTML = historicoCotacoes.map(entrada => {
+    const data = new Date(entrada.criadoEm);
+    const dataTexto = Number.isNaN(data.getTime())
+      ? "-"
+      : data.toLocaleString("pt-BR");
+
+    return `
+      <article class="cotacao-historico-item-v2" data-id="${escapeHtmlCotacaoV2(entrada.id)}">
+        <strong>${escapeHtmlCotacaoV2(entrada.cliente || "Cotação sem identificação")}</strong>
+        <p>${escapeHtmlCotacaoV2(entrada.tipo)} • ${escapeHtmlCotacaoV2(dataTexto)}</p>
+        <p>${entrada.itens?.length || 0} produto${entrada.itens?.length === 1 ? "" : "s"}${entrada.cnpj ? ` • CNPJ ${escapeHtmlCotacaoV2(entrada.cnpj)}` : ""}</p>
+
+        <div class="cotacao-historico-acoes-v2">
+          <button type="button" data-acao="reabrir">Reabrir cotação</button>
+          <button type="button" data-acao="excluir">Excluir</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  lista.querySelectorAll(".cotacao-historico-item-v2").forEach(card => {
+    const id = card.dataset.id;
+
+    card.querySelector('[data-acao="reabrir"]')?.addEventListener("click", () => {
+      reabrirCotacaoHistoricoV2(id);
+    });
+
+    card.querySelector('[data-acao="excluir"]')?.addEventListener("click", () => {
+      excluirCotacaoHistoricoV2(id);
+    });
+  });
+}
+
+function reabrirCotacaoHistoricoV2(id) {
+  const entrada = historicoCotacoes.find(item => item.id === id);
+  if (!entrada) return;
+
+  if (cotacao.length) {
+    const ok = window.confirm(
+      "Reabrir esta cotação substituirá o carrinho atual. Deseja continuar?"
+    );
+    if (!ok) return;
+  }
+
+  cotacao = (entrada.itens || []).map(item => ({
+    ...item,
+    codigoFornecedor: usuarioEhAdministrador() ? String(item.codigoFornecedor || "") : "",
+    fornecedor: usuarioEhAdministrador() ? String(item.fornecedor || "") : ""
+  }));
+
+  dadosCotacao = {
+    cliente: String(entrada.cliente || ""),
+    cnpj: String(entrada.cnpj || "")
+  };
+
+  salvarCotacaoAtual();
+  atualizarCotacaoV2();
+  fecharHistoricoCotacoesV2();
+  abrirCotacaoV2();
+  mostrarToast("Cotação reaberta.");
+}
+
+function excluirCotacaoHistoricoV2(id) {
+  const ok = window.confirm("Excluir esta cotação do histórico?");
+  if (!ok) return;
+
+  historicoCotacoes = historicoCotacoes.filter(item => item.id !== id);
+  salvarHistoricoCotacoes();
+  renderizarHistoricoCotacoesV2();
+}
+
+function abrirModalPosCotacaoV2() {
+  document.getElementById("modalPosCotacaoV2")?.classList.add("aberto");
+  document.getElementById("modalPosCotacaoV2")?.setAttribute("aria-hidden", "false");
+}
+
+function fecharModalPosCotacaoV2() {
+  document.getElementById("modalPosCotacaoV2")?.classList.remove("aberto");
+  document.getElementById("modalPosCotacaoV2")?.setAttribute("aria-hidden", "true");
+}
+
+function configurarCotacaoV2() {
+  document.getElementById("btnCotacaoTopo")?.addEventListener("click", abrirCotacaoV2);
+  document.getElementById("btnCotacaoFlutuanteV2")?.addEventListener("click", abrirCotacaoV2);
+  document.getElementById("btnFecharCotacaoV2")?.addEventListener("click", fecharCotacaoV2);
+  document.getElementById("overlayCotacaoV2")?.addEventListener("click", fecharCotacaoV2);
+
+  document.getElementById("btnCopiarCotacaoV2")?.addEventListener("click", copiarCotacaoV2);
+  document.getElementById("btnGerarPdfCotacaoV2")?.addEventListener("click", gerarPdfCotacaoV2);
+  document.getElementById("btnLimparCotacaoV2")?.addEventListener("click", () => limparCotacaoV2(true));
+
+  document.getElementById("btnHistoricoCotacoes")?.addEventListener("click", () => {
+    fecharMenu();
+    abrirHistoricoCotacoesV2();
+  });
+
+  document.getElementById("btnAbrirHistoricoCotacaoV2")?.addEventListener("click", abrirHistoricoCotacoesV2);
+  document.getElementById("btnFecharHistoricoCotacoesV2")?.addEventListener("click", fecharHistoricoCotacoesV2);
+
+  document.getElementById("modalHistoricoCotacoesV2")?.addEventListener("click", event => {
+    if (event.target.id === "modalHistoricoCotacoesV2") {
+      fecharHistoricoCotacoesV2();
+    }
+  });
+
+  document.getElementById("btnManterCotacaoV2")?.addEventListener("click", fecharModalPosCotacaoV2);
+
+  document.getElementById("btnLimparAposCotacaoV2")?.addEventListener("click", () => {
+    fecharModalPosCotacaoV2();
+    limparCotacaoV2(false);
+  });
+
+  document.getElementById("modalPosCotacaoV2")?.addEventListener("click", event => {
+    if (event.target.id === "modalPosCotacaoV2") {
+      fecharModalPosCotacaoV2();
+    }
+  });
+
+  const cliente = document.getElementById("cotacaoClienteNomeV2");
+  const cnpj = document.getElementById("cotacaoCnpjV2");
+
+  cliente?.addEventListener("input", () => {
+    dadosCotacao.cliente = cliente.value;
+    salvarCotacaoAtual();
+  });
+
+  cnpj?.addEventListener("input", () => {
+    const formatado = formatarCnpjCotacaoV2(cnpj.value);
+    cnpj.value = formatado;
+    dadosCotacao.cnpj = formatado;
+    salvarCotacaoAtual();
+  });
+
+  const lista = document.getElementById("listaCotacaoV2");
+  lista?.addEventListener("wheel", event => {
+    event.stopPropagation();
+  }, { passive: true });
+
+  lista?.addEventListener("touchmove", event => {
+    event.stopPropagation();
+  }, { passive: true });
+
+  atualizarCotacaoV2();
 }
 
 
@@ -2059,4 +2972,5 @@ configurarRodapeCatalogo();
 configurarAnimacaoCategorias();
 atualizarCategoriasAtivas();
 configurarPortalAcesso();
+configurarCotacaoV2();
 carregarProdutos();
