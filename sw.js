@@ -1,14 +1,15 @@
-const CACHE_NAME = 'catalogo-eldorado-v2';
+const CACHE_NAME = 'catalogo-eldorado-v3-sofruta';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './script.js',
+  './style.css?v=20261021-sofruta1',
+  './script.js?v=20261021-sofruta1',
   './manifest.json',
   './Produtos.xlsx',
   './Logos/Favicon.png',
   './Logos/Eldorado.png',
-  './Logos/Produtos-ternura.png'
+  './Logos/Produtos-ternura.png',
+  './Logos/SoFruta.png'
 ];
 
 self.addEventListener('install', event => {

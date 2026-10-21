@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="Logos/Favicon.png" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#009639" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20261021-sofruta1" />
 </head>
 <body class="tema-eldorado" data-perfil="nenhum">
 
@@ -188,7 +188,7 @@
     <nav id="menuLateral" class="menu-lateral">
       <button id="btnCatalogoEldorado" type="button">Catálogo Eldorado</button>
       <button id="btnProdutosTernura" type="button">Produtos Ternura</button>
-      <button id="btnMixSoFruta" type="button">Mix SóFruta</button>
+      <button id="btnMixSoFruta" type="button">🍊 Mix SóFruta</button>
       <button id="btnNovidades" type="button">Novidades</button>
       <button id="btnFavoritos" type="button">⭐ Favoritos</button>
       <button id="btnScanner" type="button">📷 Scanner EAN</button>
@@ -404,10 +404,10 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
-  <script src="script.js"></script>
+  <script src="script.js?v=20261021-sofruta1"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js?v=20261021-sofruta1", { updateViaCache: "none" }).catch(() => {}));
     }
   </script>
 
