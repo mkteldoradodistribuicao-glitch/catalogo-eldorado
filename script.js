@@ -27,7 +27,8 @@ let categoriaAtual = "todos";
 
 const ITENS_POR_PAGINA_DESKTOP = 150;
 const ITENS_POR_PAGINA_MOBILE = 80;
-const CODIGOS_EXCLUIDOS_TERNURA = ["93217", "89817"];
+const PALAVRAS_EXCLUIDAS_TERNURA = ["casaflor", "qboa"];
+const CODIGO_FORNECEDOR_SOFRUTA = "355";
 const CODIGOS_EXCLUIDOS_NOVIDADES = ["999999", "116451"];
 const CHAVE_FAVORITOS = "favoritosCatalogoEldorado";
 
@@ -61,6 +62,16 @@ const CONFIG = {
     tema: "tema-ternura",
     filtroTernura: true,
     filtroNovidade: false
+  },
+  sofruta: {
+    titulo: "Mix SóFruta",
+    subtitulo: "Catálogo exclusivo do Mix SóFruta.",
+    logo: "Logos/SoFruta.png",
+    tema: "tema-eldorado",
+    filtroTernura: false,
+    filtroNovidade: false,
+    filtroFavoritos: false,
+    filtroCodigoFornecedor: CODIGO_FORNECEDOR_SOFRUTA
   },
   novidades: {
     titulo: "Novidades",
@@ -437,9 +448,23 @@ function produtosDoModo() {
   let lista = produtos;
 
   if (config.filtroTernura) {
+    lista = lista.filter(produto => {
+      const descricaoNormalizada = normalizar(produto.descricao);
+
+      return (
+        descricaoNormalizada.includes("ternura") &&
+        !PALAVRAS_EXCLUIDAS_TERNURA.some(palavra =>
+          descricaoNormalizada.includes(palavra)
+        )
+      );
+    });
+  }
+
+  if (config.filtroCodigoFornecedor) {
+    const codigoFornecedorDoModo = normalizar(config.filtroCodigoFornecedor);
+
     lista = lista.filter(produto =>
-      normalizar(produto.descricao).includes("ternura") &&
-      !CODIGOS_EXCLUIDOS_TERNURA.includes(String(produto.codigo).trim())
+      normalizar(produto.codigoFornecedor) === codigoFornecedorDoModo
     );
   }
 
@@ -3019,6 +3044,10 @@ document.getElementById("btnCatalogoEldorado").addEventListener("click", () => {
 
 document.getElementById("btnProdutosTernura").addEventListener("click", () => {
   trocarModo("ternura");
+});
+
+document.getElementById("btnMixSoFruta").addEventListener("click", () => {
+  trocarModo("sofruta");
 });
 
 document.getElementById("btnNovidades").addEventListener("click", () => {
