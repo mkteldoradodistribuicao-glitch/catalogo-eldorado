@@ -1008,7 +1008,7 @@ function mostrarProdutos() {
         ${produto.novidade ? `<span class="selo-novidade">NOVIDADE</span>` : ""}
         ${
           produto.imagem
-            ? `<img src="${caminhoImagem}" alt="${produto.descricao}" onerror="this.outerHTML='<div class=&quot;sem-imagem&quot;>Imagem não encontrada</div>'">`
+            ? `<img src="${caminhoImagem}" alt="${produto.descricao}" loading="lazy" decoding="async" fetchpriority="low" onerror="this.outerHTML='<div class=&quot;sem-imagem&quot;>Imagem não encontrada</div>'">`
             : `<div class="sem-imagem">Sem imagem</div>`
         }
       </div>

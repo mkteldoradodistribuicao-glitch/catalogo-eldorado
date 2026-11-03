@@ -4031,3 +4031,25 @@ body.cotacao-v2-aberta {
     height: 42px;
   }
 }
+
+
+/* =========================================================
+   OTIMIZAÇÃO DE PERFORMANCE / CDN
+   ========================================================= */
+.card {
+  content-visibility: auto;
+  contain-intrinsic-size: 320px 520px;
+}
+
+.card-imagem img {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .btn-flutuante,
+  .cotacao-topo-v2,
+  .categoria-btn {
+    transition: none !important;
+  }
+}
